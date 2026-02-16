@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ocs-auth-db
+    environment:
+      POSTGRES_DB: ocs_auth
+      POSTGRES_USER: ocs_auth
+      POSTGRES_PASSWORD: ocs_auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  auth:
+    build: .
+    container_name: ocs-auth
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://ocs_auth:ocs_auth@db:5432/ocs_auth
+      JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
+      JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
+      ISSUER_URL: ${ISSUER_URL}
+      AUDIENCE: ${AUDIENCE}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      PORT: 3000
+    ports:
+      - "3000:3000"
+
+volumes:
+  db_data:

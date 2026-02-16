@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CodeChallengeMethod {
+  S256
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  passwordHash       String
+  isActive           Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  roles              UserRole[]
+  refreshTokens      RefreshToken[]
+  authorizationCodes AuthorizationCode[]
+}
+
+model Role {
+  id        String     @id @default(uuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  userRoles UserRole[]
+}
+
+model UserRole {
+  userId     String
+  roleId     String
+  assignedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model OAuthClient {
+  id                      String             @id
+  name                    String
+  isPublic                Boolean            @default(true)
+  redirectUris            String[]
+  accessTokenExpiresIn    Int                @default(600)      // segundos (padrão 10 min)
+  refreshTokenExpiresIn   Int                @default(2592000)  // segundos (padrão 30 dias)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  refreshTokens           RefreshToken[]
+  authCodes               AuthorizationCode[] @relation("ClientAuthCodes")
+}
+
+model AuthorizationCode {
+  id                  String               @id @default(uuid())
+  codeHash            String               @unique
+  userId              String
+  clientId            String
+  redirectUri         String
+  codeChallenge       String
+  codeChallengeMethod CodeChallengeMethod
+  expiresAt           DateTime
+  createdAt           DateTime             @default(now())
+  consumedAt          DateTime?
+
+  user   User        @relation(fields: [userId], references: [id])
+  client OAuthClient @relation("ClientAuthCodes", fields: [clientId], references: [id])
+
+  @@index([userId])
+  @@index([clientId])
+}
+
+model RefreshToken {
+  id                 String     @id @default(uuid())
+  tokenHash          String     @unique
+  userId             String
+  clientId           String
+  createdAt          DateTime   @default(now())
+  expiresAt          DateTime
+  revokedAt          DateTime?
+  replacedByTokenId  String?
+
+  user   User        @relation(fields: [userId], references: [id])
+  client OAuthClient @relation(fields: [clientId], references: [id])
+
+  @@index([userId])
+  @@index([clientId])
+}
