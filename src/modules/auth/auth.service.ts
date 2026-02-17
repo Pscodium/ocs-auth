@@ -157,7 +157,8 @@ export class AuthService {
     const accessToken = await signAccessToken({
       sub: user.id,
       roles: user.roles,
-      clientId: input.client_id
+      clientId: input.client_id,
+      expiresIn: accessTokenExpiresIn
     });
 
     const refreshTokenValue = generateRandomToken(64);
@@ -195,7 +196,8 @@ export class AuthService {
     const accessToken = await signAccessToken({
       sub: user.id,
       roles: user.roles,
-      clientId: input.client_id
+      clientId: input.client_id,
+      expiresIn: accessTokenExpiresIn
     });
 
     const newRefreshTokenValue = generateRandomToken(64);

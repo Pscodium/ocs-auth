@@ -17,7 +17,7 @@ async function getKid(): Promise<string> {
   return kidCache;
 }
 
-export async function signAccessToken(payload: { sub: string; roles: string[]; clientId: string }): Promise<string> {
+export async function signAccessToken(payload: { sub: string; roles: string[]; clientId: string; expiresIn: number }): Promise<string> {
   const privateKey = await privateKeyPromise;
   const kid = await getKid();
   return new SignJWT({ roles: payload.roles, client_id: payload.clientId })
@@ -26,7 +26,7 @@ export async function signAccessToken(payload: { sub: string; roles: string[]; c
     .setAudience(env.AUDIENCE)
     .setSubject(payload.sub)
     .setIssuedAt()
-    .setExpirationTime("10m")
+    .setExpirationTime(Math.floor(Date.now() / 1000) + payload.expiresIn)
     .sign(privateKey as KeyLike);
 }
 
