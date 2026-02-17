@@ -13,13 +13,21 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    container_name: ocs-auth-redis
+    ports:
+      - "6379:6379"
+
   auth:
     build: .
     container_name: ocs-auth
     depends_on:
       - db
+      - redis
     environment:
       DATABASE_URL: postgresql://ocs_auth:ocs_auth@db:5432/ocs_auth
+      REDIS_URL: redis://redis:6379
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY}
       JWT_PUBLIC_KEY: ${JWT_PUBLIC_KEY}
       ISSUER_URL: ${ISSUER_URL}

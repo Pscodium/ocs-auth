@@ -149,7 +149,7 @@ export class AuthService {
       throw new AppError("PKCE validation failed", 400, "invalid_grant");
     }
 
-    await this.authCodes.consume(authCode.id);
+    await this.authCodes.consume(codeHash);
 
     const { accessTokenExpiresIn, refreshTokenExpiresIn } = await this.getClientConfig(input.client_id);
 

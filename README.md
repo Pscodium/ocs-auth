@@ -5,9 +5,11 @@ Production-ready OAuth2-like authentication service built with Fastify, Prisma, 
 ## Requirements
 - Node.js 20+
 - PostgreSQL
+- Redis
 
 ## Setup
 1) Create a database and update `.env` from `.env.example`.
+	- Add `REDIS_URL` (example: `redis://localhost:6379`).
 2) Install dependencies: `npm install`
 3) Generate Prisma client: `npm run prisma:generate`
 4) Run migrations: `npx prisma migrate dev`

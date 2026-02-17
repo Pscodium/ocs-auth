@@ -6,11 +6,13 @@ import { ZodError } from "zod";
 import { AppError } from "@/infra/errors";
 import { getJwks } from "@/infra/jwt";
 import { getLogger } from "@/infra/logger";
+import { setRedisLogger } from "@/infra/redis";
 import { authRoutes } from "@/modules/auth/auth.routes";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
   const logger = getLogger(app.log);
+  setRedisLogger(logger);
 
   const corsOrigins = env.CORS_ORIGIN
     ? env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean)
