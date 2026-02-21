@@ -246,7 +246,7 @@ app.get('/protected', async (request, reply) => {
 ```bash
 curl -X POST http://localhost:3000/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"user@example.com","password":"StrongPass123"}'
+  -d '{"fullName":"Jane Doe","email":"user@example.com","password":"StrongPass123"}'
 ```
 
 ### Login (returns authorization code)
@@ -300,6 +300,27 @@ curl -X POST http://localhost:3000/auth/logout \
     "refresh_token":"<REFRESH_TOKEN>",
     "client_id":"electron-app"
   }'
+```
+
+### Update Current User
+
+```bash
+curl -X PATCH http://localhost:3000/users/me \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -d '{
+    "fullName":"Jane Doe Silva",
+    "email":"new-user@example.com",
+    "docType":"CPF",
+    "document":"11144477735"
+  }'
+```
+
+### Get Current User
+
+```bash
+curl -X GET http://localhost:3000/users/me \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
 ### JWKS

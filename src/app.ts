@@ -8,6 +8,7 @@ import { getJwks } from "@/infra/jwt";
 import { getLogger } from "@/infra/logger";
 import { setRedisLogger } from "@/infra/redis";
 import { authRoutes } from "@/modules/auth/auth.routes";
+import { userRoutes } from "@/modules/users/user.routes";
 
 export async function buildApp() {
   const app = Fastify({ logger: true });
@@ -41,6 +42,7 @@ export async function buildApp() {
   });
 
   app.register(authRoutes, { prefix: "/auth" });
+  app.register(userRoutes, { prefix: "/users" });
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof AppError) {
@@ -48,6 +50,11 @@ export async function buildApp() {
       return;
     }
     if (error instanceof ZodError) {
+      logger.info({
+        method: request.method,
+        url: request.url,
+        issues: error.issues
+      }, "Request schema validation failed");
       reply.code(400).send({ error: "invalid_request", message: "Invalid request" });
       return;
     }

@@ -11,8 +11,16 @@ enum CodeChallengeMethod {
   S256
 }
 
+enum DocumentType {
+  CPF
+  CNPJ
+}
+
 model User {
   id                 String              @id @default(uuid())
+  fullName           String?
+  docType            DocumentType?
+  document           String?             @unique
   email              String              @unique
   passwordHash       String
   isActive           Boolean             @default(true)

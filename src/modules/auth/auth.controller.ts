@@ -16,7 +16,7 @@ function getBearerToken(request: FastifyRequest): string {
 
 export async function registerHandler(request: FastifyRequest, reply: FastifyReply) {
   const body = registerSchema.parse(request.body);
-  const user = await authService.register(body.email, body.password);
+  const user = await authService.register(body.fullName, body.email, body.password);
   reply.code(201).send(user);
 }
 

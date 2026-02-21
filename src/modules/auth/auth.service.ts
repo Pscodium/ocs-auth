@@ -13,8 +13,8 @@ export class AuthService {
   private readonly authCodes = new AuthorizationCodeRepository();
   private readonly refreshTokens = new RefreshTokenRepository();
 
-  async register(email: string, password: string) {
-    return this.users.registerUser(email, password);
+  async register(fullName: string, email: string, password: string) {
+    return this.users.registerUser(fullName, email, password);
   }
 
   private async getClientConfig(clientId: string) {
