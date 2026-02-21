@@ -1,5 +1,6 @@
 import { SignJWT, calculateJwkThumbprint, exportJWK, importPKCS8, importSPKI, jwtVerify, type JWTPayload, type KeyLike } from "jose";
 import { env } from "@/config/env";
+import type { UserPlan } from "@prisma/client";
 
 const privateKeyPromise = importPKCS8(env.JWT_PRIVATE_KEY, "RS256");
 const publicKeyPromise = importSPKI(env.JWT_PUBLIC_KEY, "RS256");
@@ -17,10 +18,10 @@ async function getKid(): Promise<string> {
   return kidCache;
 }
 
-export async function signAccessToken(payload: { sub: string; roles: string[]; clientId: string; expiresIn: number }): Promise<string> {
+export async function signAccessToken(payload: { sub: string; roles: string[]; plan: UserPlan; clientId: string; expiresIn: number }): Promise<string> {
   const privateKey = await privateKeyPromise;
   const kid = await getKid();
-  return new SignJWT({ roles: payload.roles, client_id: payload.clientId })
+  return new SignJWT({ roles: payload.roles, plan: payload.plan, client_id: payload.clientId })
     .setProtectedHeader({ alg: "RS256", kid })
     .setIssuer(env.ISSUER_URL)
     .setAudience(env.AUDIENCE)

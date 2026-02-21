@@ -157,6 +157,7 @@ export class AuthService {
     const accessToken = await signAccessToken({
       sub: user.id,
       roles: user.roles,
+      plan: user.plan,
       clientId: input.client_id,
       expiresIn: accessTokenExpiresIn
     });
@@ -196,6 +197,7 @@ export class AuthService {
     const accessToken = await signAccessToken({
       sub: user.id,
       roles: user.roles,
+      plan: user.plan,
       clientId: input.client_id,
       expiresIn: accessTokenExpiresIn
     });

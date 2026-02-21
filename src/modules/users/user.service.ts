@@ -2,7 +2,7 @@ import { AppError } from "@/infra/errors";
 import { hashPassword } from "@/infra/crypto";
 import { UserRepository } from "./user.repo";
 import type { PublicUser } from "./user.types";
-import type { DocumentType } from "@prisma/client";
+import type { DocumentType, UserPlan } from "@prisma/client";
 
 type UserRoleWithRole = { role: { name: string } };
 
@@ -15,10 +15,11 @@ export class UserService {
     docType: DocumentType | null;
     document: string | null;
     email: string;
+    plan: UserPlan;
     roles: UserRoleWithRole[];
   }): PublicUser {
     const roles = user.roles.map((userRole: UserRoleWithRole) => userRole.role.name);
-    return { id: user.id, fullName: user.fullName, docType: user.docType, document: user.document, email: user.email, roles };
+    return { id: user.id, fullName: user.fullName, docType: user.docType, document: user.document, email: user.email, plan: user.plan, roles };
   }
 
   async registerUser(fullName: string, email: string, password: string): Promise<PublicUser> {

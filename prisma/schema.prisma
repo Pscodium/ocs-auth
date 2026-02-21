@@ -16,6 +16,12 @@ enum DocumentType {
   CNPJ
 }
 
+enum UserPlan {
+  free_plan
+  premium_plan
+  ultimate_plan
+}
+
 model User {
   id                 String              @id @default(uuid())
   fullName           String?
@@ -23,6 +29,7 @@ model User {
   document           String?             @unique
   email              String              @unique
   passwordHash       String
+  plan               UserPlan            @default(free_plan)
   isActive           Boolean             @default(true)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
