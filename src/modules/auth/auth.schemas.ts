@@ -3,7 +3,7 @@ import { z } from "zod";
 export const registerSchema = z.object({
   fullName: z.string().min(3),
   email: z.string().email(),
-  password: z.string().min(8)
+  password: z.string().regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/)
 });
 
 export const loginSchema = z.object({
