@@ -23,7 +23,7 @@ function validateAndNormalizeRedirectUri(redirectUri: string): string {
   const allowedOrigins = resolveAllowedOrigins();
 
   if (allowedOrigins.length > 0 && !allowedOrigins.includes(parsed.origin)) {
-    throw new AppError("redirect_uri not allowed", 400, "invalid_redirect_uri");
+    throw new AppError(`redirect_uri: ${parsed.origin} not allowed`, 400, "invalid_redirect_uri");
   }
 
   return parsed.toString();
