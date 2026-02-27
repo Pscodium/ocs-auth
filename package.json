@@ -11,7 +11,9 @@
     "prisma:migrate": "prisma migrate deploy"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^10.0.0",
+    "@fastify/oauth2": "^8.2.0",
     "@fastify/rate-limit": "^10.0.1",
     "@prisma/client": "^5.22.0",
     "argon2": "^0.31.2",

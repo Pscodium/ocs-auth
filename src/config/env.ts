@@ -16,7 +16,14 @@ const envSchema = z.object({
   // Token expiration times (in seconds)
   ACCESS_TOKEN_EXPIRES_IN: z.coerce.number().int().positive().default(600),           // 10 minutes
   REFRESH_TOKEN_EXPIRES_IN: z.coerce.number().int().positive().default(2592000),     // 30 days
-  AUTH_CODE_EXPIRES_IN: z.coerce.number().int().positive().default(300)              // 5 minutes
+  AUTH_CODE_EXPIRES_IN: z.coerce.number().int().positive().default(300),             // 5 minutes
+  BASE_URL: z.string().url(),
+  GOOGLE_CLIENT_ID: z.string().min(1),
+  GOOGLE_CLIENT_SECRET: z.string().min(1),
+  GITHUB_CLIENT_ID: z.string().min(1),
+  GITHUB_CLIENT_SECRET: z.string().min(1),
+  MICROSOFT_CLIENT_ID: z.string().min(1),
+  MICROSOFT_CLIENT_SECRET: z.string().min(1)
 });
 
 export const env = envSchema.parse(process.env);

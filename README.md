@@ -10,6 +10,11 @@ Production-ready OAuth2-like authentication service built with Fastify, Prisma, 
 ## Setup
 1) Create a database and update `.env` from `.env.example`.
 	- Add `REDIS_URL` (example: `redis://localhost:6379`).
+	- Add OAuth provider settings:
+		- `BASE_URL`
+		- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+		- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+		- `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`
 2) Install dependencies: `npm install`
 3) Generate Prisma client: `npm run prisma:generate`
 4) Run migrations: `npx prisma migrate dev`
@@ -22,3 +27,10 @@ Production-ready OAuth2-like authentication service built with Fastify, Prisma, 
 ## Notes
 - Create OAuth clients in the database before use.
 - JWT keys must be valid RSA PEM values.
+- Social OAuth2 endpoints:
+	- `GET /auth/google`
+	- `GET /auth/google/callback`
+	- `GET /auth/github`
+	- `GET /auth/github/callback`
+	- `GET /auth/microsoft`
+	- `GET /auth/microsoft/callback`

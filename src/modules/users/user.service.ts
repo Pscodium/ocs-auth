@@ -1,5 +1,5 @@
 import { AppError } from "@/infra/errors";
-import { hashPassword } from "@/infra/crypto";
+import { generateRandomToken, hashPassword } from "@/infra/crypto";
 import { UserRepository } from "./user.repo";
 import type { PublicUser } from "./user.types";
 import type { DocumentType, UserPlan } from "@prisma/client";
@@ -29,6 +29,21 @@ export class UserService {
     }
 
     const passwordHash = await hashPassword(password);
+    return this.createUserWithDefaultRole(fullName, email, passwordHash);
+  }
+
+  async registerSocialUser(fullName: string | null, email: string): Promise<PublicUser> {
+    const existing = await this.users.findByEmail(email);
+    if (existing) {
+      throw new AppError("Email already registered", 409, "email_exists");
+    }
+
+    const randomPassword = generateRandomToken(32);
+    const passwordHash = await hashPassword(randomPassword);
+    return this.createUserWithDefaultRole(fullName ?? "", email, passwordHash);
+  }
+
+  private async createUserWithDefaultRole(fullName: string, email: string, passwordHash: string): Promise<PublicUser> {
     const user = await this.users.createUser(fullName, email, passwordHash);
     const role = await this.users.ensureRole("user");
     await this.users.assignRole(user.id, role.id);

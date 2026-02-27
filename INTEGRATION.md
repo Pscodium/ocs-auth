@@ -239,6 +239,28 @@ app.get('/protected', async (request, reply) => {
 
 ---
 
+## Social OAuth2 Flow
+
+- Start login in browser:
+  - `GET /auth/google`
+  - `GET /auth/github`
+  - `GET /auth/microsoft`
+- Provider redirects back to callback route.
+- Auth service resolves user by provider account (or email), links/creates user, and returns JSON:
+
+```json
+{
+  "accessToken": "<JWT>",
+  "user": {
+    "id": "<USER_ID>",
+    "email": "user@example.com",
+    "name": "Jane Doe"
+  }
+}
+```
+
+---
+
 ## cURL Examples
 
 ### Register

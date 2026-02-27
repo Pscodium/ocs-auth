@@ -7,6 +7,7 @@ import { AppError } from "@/infra/errors";
 import { getJwks } from "@/infra/jwt";
 import { getLogger } from "@/infra/logger";
 import { setRedisLogger } from "@/infra/redis";
+import { socialOAuthPlugin } from "@/modules/auth/social-oauth.plugin";
 import { authRoutes } from "@/modules/auth/auth.routes";
 import { userRoutes } from "@/modules/users/user.routes";
 
@@ -40,6 +41,8 @@ export async function buildApp() {
     const jwks = await getJwks();
     reply.send(jwks);
   });
+
+  await app.register(socialOAuthPlugin);
 
   app.register(authRoutes, { prefix: "/auth" });
   app.register(userRoutes, { prefix: "/users" });
