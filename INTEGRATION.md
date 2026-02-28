@@ -358,14 +358,28 @@ curl http://localhost:3000/.well-known/jwks.json
 Before testing, create an OAuth client in the database:
 
 ```sql
-INSERT INTO "OAuthClient" (id, name, "isPublic", "redirectUris", "createdAt")
+INSERT INTO "OAuthClient" (id, name, "isPublic", "redirectUris", "createdAt", "updatedAt")
 VALUES (
   'electron-app',
   'Electron App',
   true,
   ARRAY['http://localhost:14000/callback'],
+  NOW(),
   NOW()
 );
+
+INSERT INTO "OAuthClient" (id, name, "isPublic", "redirectUris", "accessTokenExpiresIn", "refreshTokenExpiresIn", "createdAt", "updatedAt")
+VALUES (
+  'social_oauth',
+  'Social OAuth',
+  true,
+  ARRAY[]::TEXT[],
+  600,
+  2592000,
+  NOW(),
+  NOW()
+)
+ON CONFLICT (id) DO NOTHING;
 ```
 
 Or use Prisma Studio:

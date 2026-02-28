@@ -26,6 +26,7 @@ Production-ready OAuth2-like authentication service built with Fastify, Prisma, 
 
 ## Notes
 - Create OAuth clients in the database before use.
+- Migration provisions `social_oauth` client used by social login JWT issuance.
 - JWT keys must be valid RSA PEM values.
 - Social OAuth2 endpoints:
 	- `GET /auth/google`

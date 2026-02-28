@@ -1,13 +1,14 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { AppError } from "@/infra/errors";
-import { env } from "@/config/env";
 import { signAccessToken } from "@/infra/jwt";
+import { prisma } from "@/infra/prisma";
 import type { SocialProvider } from "@prisma/client";
 import { UserService } from "@/modules/users/user.service";
 import { SocialAuthRepository } from "./social-auth.repo";
 import type { SocialAuthResult, SocialProfile } from "./social.types";
 
 const GITHUB_API_VERSION = "2022-11-28";
+const SOCIAL_OAUTH_CLIENT_ID = "social_oauth";
 
 type OAuth2NamespaceLike = {
   generateAuthorizationUri: (request: FastifyRequest, reply: FastifyReply) => Promise<string>;
@@ -21,6 +22,21 @@ type OAuth2NamespaceLike = {
 export class SocialAuthService {
   private readonly users = new UserService();
   private readonly socialAuth = new SocialAuthRepository();
+
+  private async getSocialClientConfig() {
+    const client = await prisma.oAuthClient.findUnique({
+      where: { id: SOCIAL_OAUTH_CLIENT_ID }
+    });
+
+    if (!client) {
+      throw new AppError("Social OAuth client is not configured", 500, "social_client_not_configured");
+    }
+
+    return {
+      clientId: client.id,
+      accessTokenExpiresIn: client.accessTokenExpiresIn
+    };
+  }
 
   async generateAuthorizationUri(namespace: OAuth2NamespaceLike, request: FastifyRequest, reply: FastifyReply) {
     const authorizationUri = await namespace.generateAuthorizationUri(request, reply);
@@ -78,13 +94,14 @@ export class SocialAuthService {
   }
 
   private async issueJwtForUser(userId: string): Promise<SocialAuthResult> {
+    const { clientId, accessTokenExpiresIn } = await this.getSocialClientConfig();
     const user = await this.users.getUserWithRoles(userId);
     const accessToken = await signAccessToken({
       sub: user.id,
       roles: user.roles,
       plan: user.plan,
-      clientId: "social_oauth",
-      expiresIn: env.ACCESS_TOKEN_EXPIRES_IN
+      clientId,
+      expiresIn: accessTokenExpiresIn
     });
 
     return {
