@@ -1,8 +1,11 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { AppError } from "@/infra/errors";
+import { env } from "@/config/env";
+import { generateRandomToken, hashToken } from "@/infra/crypto";
 import { signAccessToken } from "@/infra/jwt";
 import { prisma } from "@/infra/prisma";
 import type { SocialProvider } from "@prisma/client";
+import { AuthorizationCodeRepository } from "@/modules/tokens/auth-code.repo";
 import { UserService } from "@/modules/users/user.service";
 import { SocialAuthRepository } from "./social-auth.repo";
 import type { SocialAuthResult, SocialProfile } from "./social.types";
@@ -22,6 +25,46 @@ type OAuth2NamespaceLike = {
 export class SocialAuthService {
   private readonly users = new UserService();
   private readonly socialAuth = new SocialAuthRepository();
+  private readonly authCodes = new AuthorizationCodeRepository();
+
+  async assertClientRedirect(clientId: string, redirectUri: string) {
+    const client = await prisma.oAuthClient.findUnique({ where: { id: clientId } });
+    if (!client) {
+      throw new AppError("Unknown client", 400, "invalid_client");
+    }
+    if (!client.redirectUris.includes(redirectUri)) {
+      throw new AppError("Invalid redirect uri", 400, "invalid_redirect_uri");
+    }
+  }
+
+  async issueAuthorizationCodeForUser(input: {
+    userId: string;
+    clientId: string;
+    redirectUri: string;
+    codeChallenge: string;
+    codeChallengeMethod: "S256";
+  }) {
+    await this.assertClientRedirect(input.clientId, input.redirectUri);
+
+    const code = generateRandomToken(48);
+    const codeHash = hashToken(code);
+    const expiresAt = new Date(Date.now() + env.AUTH_CODE_EXPIRES_IN * 1000);
+
+    await this.authCodes.createAuthCode({
+      codeHash,
+      userId: input.userId,
+      clientId: input.clientId,
+      redirectUri: input.redirectUri,
+      codeChallenge: input.codeChallenge,
+      codeChallengeMethod: input.codeChallengeMethod,
+      expiresAt
+    });
+
+    return {
+      code,
+      expires_in: env.AUTH_CODE_EXPIRES_IN
+    };
+  }
 
   private async getSocialClientConfig() {
     const client = await prisma.oAuthClient.findUnique({

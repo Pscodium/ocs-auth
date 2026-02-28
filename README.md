@@ -35,6 +35,7 @@ Production-ready OAuth2-like authentication service built with Fastify, Prisma, 
 	- `GET /auth/github/callback`
 	- `GET /auth/microsoft`
 	- `GET /auth/microsoft/callback`
-- To return user to front-end after social login, call start endpoints with `redirect_uri`:
-	- Example: `GET /auth/google?redirect_uri=https://financial.pscodium.dev/callback`
-	- Callback redirects to your app with `?token=<JWT>&code=<PROVIDER_CODE>`
+- To return user to front-end after social login, call start endpoints with PKCE context:
+	- Example: `GET /auth/google?redirect_uri=https://financial.pscodium.dev/callback&client_id=electron-app&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
+	- Callback redirects to your app with `?accessToken=<JWT>&code=<INTERNAL_AUTH_CODE>`
+	- Exchange `code` at `POST /auth/token` with `grant_type=authorization_code`, `client_id`, `redirect_uri`, and `code_verifier`.

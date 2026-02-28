@@ -241,12 +241,13 @@ app.get('/protected', async (request, reply) => {
 
 ## Social OAuth2 Flow
 
-- Start login in browser:
-  - `GET /auth/google`
-  - `GET /auth/github`
-  - `GET /auth/microsoft`
-- If `redirect_uri` is provided in start endpoint, callback redirects to front with query params:
-  - `?accessToken=<JWT>&code=<PROVIDER_CODE>`
+- Start login in browser with PKCE/client context:
+  - `GET /auth/google?redirect_uri=<FRONT_CALLBACK>&client_id=<CLIENT_ID>&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
+  - `GET /auth/github?redirect_uri=<FRONT_CALLBACK>&client_id=<CLIENT_ID>&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
+  - `GET /auth/microsoft?redirect_uri=<FRONT_CALLBACK>&client_id=<CLIENT_ID>&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
+- Callback redirects to front with query params:
+  - `?accessToken=<JWT>&code=<INTERNAL_AUTH_CODE>`
+- Use the returned `code` in `POST /auth/token` (`grant_type=authorization_code`) with `client_id`, `redirect_uri` and original `code_verifier` to obtain `refresh_token`.
 - Provider redirects back to callback route.
 - Auth service resolves user by provider account (or email), links/creates user, and returns JSON:
 
@@ -260,6 +261,110 @@ app.get('/protected', async (request, reply) => {
   }
 }
 ```
+
+### Complete Front-end Example (Social + PKCE)
+
+```javascript
+import crypto from 'crypto';
+
+const AUTH_BASE_URL = 'http://localhost:3000';
+const CLIENT_ID = 'electron-app';
+const FRONT_CALLBACK_URL = 'http://localhost:14000/callback';
+
+function generatePKCE() {
+  const verifier = crypto.randomBytes(32).toString('base64url');
+  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
+  return { verifier, challenge };
+}
+
+function buildSocialStartUrl(provider, pkce) {
+  const url = new URL(`${AUTH_BASE_URL}/auth/${provider}`);
+  url.searchParams.set('redirect_uri', FRONT_CALLBACK_URL);
+  url.searchParams.set('client_id', CLIENT_ID);
+  url.searchParams.set('code_challenge', pkce.challenge);
+  url.searchParams.set('code_challenge_method', 'S256');
+  return url.toString();
+}
+
+async function exchangeAuthorizationCode(code, codeVerifier) {
+  const response = await fetch(`${AUTH_BASE_URL}/auth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: FRONT_CALLBACK_URL,
+      client_id: CLIENT_ID,
+      code_verifier: codeVerifier
+    })
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Token exchange failed: ${response.status} ${errorBody}`);
+  }
+
+  return response.json();
+}
+
+export async function startGoogleLogin(openBrowser) {
+  const pkce = generatePKCE();
+
+  // Persist temporarily until callback returns
+  localStorage.setItem('social_code_verifier', pkce.verifier);
+
+  const socialUrl = buildSocialStartUrl('google', pkce);
+  await openBrowser(socialUrl);
+}
+
+export async function startGithubLogin(openBrowser) {
+  const pkce = generatePKCE();
+  localStorage.setItem('social_code_verifier', pkce.verifier);
+  const socialUrl = buildSocialStartUrl('github', pkce);
+  await openBrowser(socialUrl);
+}
+
+export async function startMicrosoftLogin(openBrowser) {
+  const pkce = generatePKCE();
+  localStorage.setItem('social_code_verifier', pkce.verifier);
+  const socialUrl = buildSocialStartUrl('microsoft', pkce);
+  await openBrowser(socialUrl);
+}
+
+// Call this when your app receives FRONT_CALLBACK_URL
+export async function handleSocialCallback(callbackUrl) {
+  const url = new URL(callbackUrl);
+  const authorizationCode = url.searchParams.get('code');
+  const socialAccessToken = url.searchParams.get('accessToken');
+  const codeVerifier = localStorage.getItem('social_code_verifier');
+
+  if (!authorizationCode) {
+    throw new Error('Missing internal authorization code in callback URL');
+  }
+
+  if (!codeVerifier) {
+    throw new Error('Missing PKCE code verifier');
+  }
+
+  // Exchange internal code to obtain refresh token for app session
+  const tokens = await exchangeAuthorizationCode(authorizationCode, codeVerifier);
+
+  // Persist canonical session tokens used by your app
+  localStorage.setItem('access_token', tokens.access_token);
+  localStorage.setItem('refresh_token', tokens.refresh_token);
+
+  // Optional: direct token from social callback (already JWT from auth service)
+  if (socialAccessToken) {
+    localStorage.setItem('social_access_token', socialAccessToken);
+  }
+
+  localStorage.removeItem('social_code_verifier');
+
+  return tokens;
+}
+```
+
+For Electron, `openBrowser` can wrap `shell.openExternal(url)`. In web apps, use `window.location.assign(url)`.
 
 ---
 
