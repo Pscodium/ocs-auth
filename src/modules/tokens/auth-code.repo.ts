@@ -60,7 +60,7 @@ export class AuthorizationCodeRepository {
 
   async consume(codeHash: string) {
     const redis = await getRedisClient();
-    await redis.del(this.getKey(codeHash));
+    // await redis.del(this.getKey(codeHash));
   }
 
   private getKey(codeHash: string) {
