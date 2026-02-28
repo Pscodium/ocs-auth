@@ -245,6 +245,8 @@ app.get('/protected', async (request, reply) => {
   - `GET /auth/google`
   - `GET /auth/github`
   - `GET /auth/microsoft`
+- If `redirect_uri` is provided in start endpoint, callback redirects to front with query params:
+  - `?accessToken=<JWT>&code=<PROVIDER_CODE>`
 - Provider redirects back to callback route.
 - Auth service resolves user by provider account (or email), links/creates user, and returns JSON:
 

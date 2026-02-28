@@ -10,6 +10,10 @@ const socialStartQuerySchema = z.object({
   redirect_uri: z.string().url().optional()
 });
 
+const socialCallbackQuerySchema = z.object({
+  code: z.string().optional()
+}).passthrough();
+
 const REDIRECT_COOKIE_TTL_SECONDS = 600;
 
 function resolveAllowedOrigins(): string[] {
@@ -47,11 +51,12 @@ function clearRedirectCookie(reply: FastifyReply, cookieName: string) {
   reply.clearCookie(cookieName, { path: "/auth" });
 }
 
-function appendAccessTokenToRedirectUri(redirectUri: string, accessToken: string): string {
+function appendAuthParamsToRedirectUri(redirectUri: string, accessToken: string, code?: string): string {
   const url = new URL(redirectUri);
-  const fragmentParams = new URLSearchParams(url.hash.startsWith("#") ? url.hash.slice(1) : "");
-  fragmentParams.set("accessToken", accessToken);
-  url.hash = fragmentParams.toString();
+  url.searchParams.set("accessToken", accessToken);
+  if (code) {
+    url.searchParams.set("code", code);
+  }
   return url.toString();
 }
 
@@ -85,33 +90,36 @@ export async function microsoftOAuthStartHandler(request: FastifyRequest, reply:
 }
 
 export async function googleOAuthCallbackHandler(request: FastifyRequest, reply: FastifyReply) {
+  const callbackQuery = socialCallbackQuerySchema.parse(request.query);
   const result = await socialAuthService.handleGoogleCallback(request.server.googleOAuth2, request, reply);
   const redirectUri = getRedirectUriFromCookie(request, "google-social-redirect-uri");
   clearRedirectCookie(reply, "google-social-redirect-uri");
   if (redirectUri) {
-    reply.redirect(appendAccessTokenToRedirectUri(redirectUri, result.accessToken));
+    reply.redirect(appendAuthParamsToRedirectUri(redirectUri, result.accessToken, callbackQuery.code));
     return;
   }
   reply.send(result);
 }
 
 export async function githubOAuthCallbackHandler(request: FastifyRequest, reply: FastifyReply) {
+  const callbackQuery = socialCallbackQuerySchema.parse(request.query);
   const result = await socialAuthService.handleGithubCallback(request.server.githubOAuth2, request, reply);
   const redirectUri = getRedirectUriFromCookie(request, "github-social-redirect-uri");
   clearRedirectCookie(reply, "github-social-redirect-uri");
   if (redirectUri) {
-    reply.redirect(appendAccessTokenToRedirectUri(redirectUri, result.accessToken));
+    reply.redirect(appendAuthParamsToRedirectUri(redirectUri, result.accessToken, callbackQuery.code));
     return;
   }
   reply.send(result);
 }
 
 export async function microsoftOAuthCallbackHandler(request: FastifyRequest, reply: FastifyReply) {
+  const callbackQuery = socialCallbackQuerySchema.parse(request.query);
   const result = await socialAuthService.handleMicrosoftCallback(request.server.microsoftOAuth2, request, reply);
   const redirectUri = getRedirectUriFromCookie(request, "microsoft-social-redirect-uri");
   clearRedirectCookie(reply, "microsoft-social-redirect-uri");
   if (redirectUri) {
-    reply.redirect(appendAccessTokenToRedirectUri(redirectUri, result.accessToken));
+    reply.redirect(appendAuthParamsToRedirectUri(redirectUri, result.accessToken, callbackQuery.code));
     return;
   }
   reply.send(result);

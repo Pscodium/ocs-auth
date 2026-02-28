@@ -37,4 +37,4 @@ Production-ready OAuth2-like authentication service built with Fastify, Prisma, 
 	- `GET /auth/microsoft/callback`
 - To return user to front-end after social login, call start endpoints with `redirect_uri`:
 	- Example: `GET /auth/google?redirect_uri=https://financial.pscodium.dev/callback`
-	- Callback redirects to your app with `#accessToken=<JWT>`
+	- Callback redirects to your app with `?token=<JWT>&code=<PROVIDER_CODE>`
