@@ -47,7 +47,7 @@ export class AuthorizationCodeRepository {
     };
 
     if (new Date(data.expiresAt).getTime() <= Date.now()) {
-      await redis.del(this.getKey(codeHash));
+      // await redis.del(this.getKey(codeHash));
       return null;
     }
 
