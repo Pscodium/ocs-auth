@@ -1,5 +1,4 @@
 import type { FastifyInstance } from "fastify";
-import cookie from "@fastify/cookie";
 import oauthPlugin from "@fastify/oauth2";
 import fp from "fastify-plugin";
 import { env } from "@/config/env";
@@ -9,8 +8,6 @@ function buildCallbackUrl(pathname: string) {
 }
 
 async function socialOAuthPluginImpl(app: FastifyInstance) {
-  await app.register(cookie);
-
   await app.register(oauthPlugin, {
     name: "googleOAuth2",
     scope: ["openid", "email", "profile"],

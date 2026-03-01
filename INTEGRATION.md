@@ -41,6 +41,7 @@ async function exchangeCode(code, verifier) {
   const response = await fetch('http://localhost:3000/auth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({
       grant_type: 'authorization_code',
       code,
@@ -51,11 +52,11 @@ async function exchangeCode(code, verifier) {
   });
   
   const tokens = await response.json();
-  // { access_token, refresh_token, expires_in, token_type }
+    // { access_token, refresh_token, refresh_token_expires_in, expires_in, token_type }
   
-  // Store tokens (e.g., localStorage, secure storage)
+    // Store only access token in JS storage.
+    // refresh_token is also issued in HttpOnly cookie by backend.
   localStorage.setItem('access_token', tokens.access_token);
-  localStorage.setItem('refresh_token', tokens.refresh_token);
   
   return tokens;
 }
@@ -81,21 +82,18 @@ async function callAPI() {
 
 ```javascript
 async function refreshToken() {
-  const refreshToken = localStorage.getItem('refresh_token');
-  
   const response = await fetch('http://localhost:3000/auth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({
       grant_type: 'refresh_token',
-      refresh_token: refreshToken,
       client_id: 'electron-app'
     })
   });
   
   const tokens = await response.json();
   localStorage.setItem('access_token', tokens.access_token);
-  localStorage.setItem('refresh_token', tokens.refresh_token);
   
   return tokens;
 }
@@ -105,19 +103,16 @@ async function refreshToken() {
 
 ```javascript
 async function logout() {
-  const refreshToken = localStorage.getItem('refresh_token');
-  
   await fetch('http://localhost:3000/auth/logout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({
-      refresh_token: refreshToken,
       client_id: 'electron-app'
     })
   });
   
   localStorage.removeItem('access_token');
-  localStorage.removeItem('refresh_token');
 }
 ```
 

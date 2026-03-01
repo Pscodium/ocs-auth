@@ -2,11 +2,40 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import { getAuthenticatedUserId } from "@/shared/http/auth-context";
 import { AppError } from "@/shared/errors";
 import { getRedisClient } from "@/shared/cache/redis";
+import { env } from "@/config/env";
 import { AuthService } from "../application/auth.service";
 import { authorizeQuerySchema, loginSchema, logoutSchema, registerSchema, tokenSchema } from "./auth.schemas";
 
 const authService = new AuthService();
 const TOKEN_RATE_LIMIT_WINDOW_SECONDS = 60;
+const REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
+
+function shouldUseSecureCookies() {
+  return env.NODE_ENV === "production" || requestBaseUrlIsHttps();
+}
+
+function requestBaseUrlIsHttps() {
+  return env.BASE_URL.startsWith("https://");
+}
+
+function setRefreshTokenCookie(reply: FastifyReply, refreshToken: string, maxAgeSeconds?: number) {
+  reply.setCookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken, {
+    httpOnly: true,
+    secure: shouldUseSecureCookies(),
+    sameSite: "lax",
+    path: "/auth",
+    ...(maxAgeSeconds ? { maxAge: maxAgeSeconds } : {})
+  });
+}
+
+function clearRefreshTokenCookie(reply: FastifyReply) {
+  reply.clearCookie(REFRESH_TOKEN_COOKIE_NAME, {
+    path: "/auth",
+    httpOnly: true,
+    secure: shouldUseSecureCookies(),
+    sameSite: "lax"
+  });
+}
 
 function getTokenRateLimitByGrantType(grantType: "authorization_code" | "refresh_token") {
   if (grantType === "refresh_token") {
@@ -56,17 +85,53 @@ export async function authorizeHandler(request: FastifyRequest, reply: FastifyRe
 
 export async function tokenHandler(request: FastifyRequest, reply: FastifyReply) {
   const body = tokenSchema.parse(request.body);
+  if (body.grant_type === "refresh_token") {
+    const refreshToken = body.refresh_token ?? request.cookies[REFRESH_TOKEN_COOKIE_NAME];
+    if (!refreshToken) {
+      throw new AppError("Missing refresh token", 400, "invalid_request");
+    }
+
+    await enforceTokenRateLimit({
+      ip: request.ip,
+      clientId: body.client_id,
+      grantType: body.grant_type
+    });
+
+    const result = await authService.token({
+      grant_type: "refresh_token",
+      client_id: body.client_id,
+      refresh_token: refreshToken
+    });
+
+    if (result.refresh_token) {
+      setRefreshTokenCookie(reply, result.refresh_token, result.refresh_token_expires_in);
+    }
+    reply.send(result);
+    return;
+  }
+
   await enforceTokenRateLimit({
     ip: request.ip,
     clientId: body.client_id,
     grantType: body.grant_type
   });
+
   const result = await authService.token(body);
+  if ("refresh_token" in result && result.refresh_token) {
+    setRefreshTokenCookie(reply, result.refresh_token, result.refresh_token_expires_in);
+  }
   reply.send(result);
 }
 
 export async function logoutHandler(request: FastifyRequest, reply: FastifyReply) {
   const body = logoutSchema.parse(request.body);
-  await authService.logout(body);
+  const refreshToken = body.refresh_token ?? request.cookies[REFRESH_TOKEN_COOKIE_NAME];
+  if (refreshToken) {
+    await authService.logout({
+      refresh_token: refreshToken,
+      client_id: body.client_id
+    });
+  }
+  clearRefreshTokenCookie(reply);
   reply.code(204).send();
 }

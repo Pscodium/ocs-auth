@@ -39,6 +39,8 @@ Production-ready OAuth2-like authentication service built with Fastify, Prisma, 
 	- Example: `GET /auth/google?redirect_uri=https://financial.pscodium.dev/callback&client_id=electron-app&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
 	- Callback redirects to your app with `?code=<INTERNAL_AUTH_CODE>`
 	- Exchange `code` at `POST /auth/token` with `grant_type=authorization_code`, `client_id`, `redirect_uri`, and `code_verifier`.
+- `POST /auth/token` now sets `refresh_token` in cookie `HttpOnly` + `Secure` + `SameSite=Lax` (`path=/auth`).
+- For `grant_type=refresh_token`, you can omit `refresh_token` in body and use the cookie automatically.
 
 ## Project Structure
 - `src/modules/*/presentation`: HTTP layer (routes, controllers, request schemas).

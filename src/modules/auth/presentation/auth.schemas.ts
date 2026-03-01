@@ -35,12 +35,12 @@ export const tokenSchema = z.discriminatedUnion("grant_type", [
   }),
   z.object({
     grant_type: z.literal("refresh_token"),
-    refresh_token: z.string().min(32),
+    refresh_token: z.string().min(32).optional(),
     client_id: z.string().min(1)
   })
 ]);
 
 export const logoutSchema = z.object({
-  refresh_token: z.string().min(32),
+  refresh_token: z.string().min(32).optional(),
   client_id: z.string().min(1)
 });

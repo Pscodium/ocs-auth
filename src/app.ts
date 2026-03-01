@@ -1,4 +1,5 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { env } from "@/config/env";
@@ -34,6 +35,8 @@ async function registerSecurityPlugins(app: FastifyInstance) {
     },
     credentials: true
   });
+
+  await app.register(cookie);
 
   await app.register(rateLimit, { global: false });
 }

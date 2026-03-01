@@ -178,7 +178,8 @@ export class AuthService {
       access_token: accessToken,
       token_type: "Bearer",
       expires_in: accessTokenExpiresIn,
-      refresh_token: refreshTokenValue
+      refresh_token: refreshTokenValue,
+      refresh_token_expires_in: refreshTokenExpiresIn
     };
   }
 
@@ -245,7 +246,8 @@ export class AuthService {
       access_token: accessToken,
       token_type: "Bearer",
       expires_in: accessTokenExpiresIn,
-      refresh_token: newRefreshTokenValue
+      refresh_token: newRefreshTokenValue,
+      refresh_token_expires_in: refreshTokenExpiresIn
     };
   }
 
