@@ -1,4 +1,4 @@
-import { prisma } from "@/infra/prisma";
+import { prisma } from "@/shared/persistence/prisma";
 
 export class RefreshTokenRepository {
   async createRefreshToken(data: {

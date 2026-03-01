@@ -1,18 +1,9 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { AppError } from "@/infra/errors";
-import { verifyAccessToken } from "@/infra/jwt";
-import { AuthService } from "./auth.service";
+import { getAuthenticatedUserId } from "@/shared/http/auth-context";
+import { AuthService } from "../application/auth.service";
 import { authorizeQuerySchema, loginSchema, logoutSchema, registerSchema, tokenSchema } from "./auth.schemas";
 
 const authService = new AuthService();
-
-function getBearerToken(request: FastifyRequest): string {
-  const auth = request.headers.authorization;
-  if (!auth || !auth.startsWith("Bearer ")) {
-    throw new AppError("Missing access token", 401, "unauthorized");
-  }
-  return auth.slice("Bearer ".length);
-}
 
 export async function registerHandler(request: FastifyRequest, reply: FastifyReply) {
   const body = registerSchema.parse(request.body);
@@ -28,12 +19,7 @@ export async function loginHandler(request: FastifyRequest, reply: FastifyReply)
 
 export async function authorizeHandler(request: FastifyRequest, reply: FastifyReply) {
   const query = authorizeQuerySchema.parse(request.query);
-  const token = getBearerToken(request);
-  const payload = await verifyAccessToken(token);
-  const userId = payload.sub;
-  if (!userId) {
-    throw new AppError("Invalid access token", 401, "unauthorized");
-  }
+  const userId = await getAuthenticatedUserId(request);
   const result = await authService.authorize(userId, query);
   reply.send({ ...result, state: query.state });
 }

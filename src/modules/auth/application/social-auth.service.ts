@@ -1,14 +1,14 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { AppError } from "@/infra/errors";
+import { AppError } from "@/shared/errors";
 import { env } from "@/config/env";
-import { generateRandomToken, hashToken } from "@/infra/crypto";
-import { signAccessToken } from "@/infra/jwt";
-import { prisma } from "@/infra/prisma";
+import { generateRandomToken, hashToken } from "@/shared/security/crypto";
+import { signAccessToken } from "@/shared/security/jwt";
+import { prisma } from "@/shared/persistence/prisma";
 import type { SocialProvider } from "@prisma/client";
-import { AuthorizationCodeRepository } from "@/modules/tokens/auth-code.repo";
-import { UserService } from "@/modules/users/user.service";
-import { SocialAuthRepository } from "./social-auth.repo";
-import type { SocialAuthResult, SocialProfile } from "./social.types";
+import { AuthorizationCodeRepository } from "@/modules/auth/infrastructure/repositories/auth-code.repo";
+import { UserService } from "@/modules/users/application/user.service";
+import { SocialAuthRepository } from "../infrastructure/repositories/social-auth.repo";
+import type { SocialAuthResult, SocialProfile } from "../domain/social.types";
 
 const GITHUB_API_VERSION = "2022-11-28";
 const SOCIAL_OAUTH_CLIENT_ID = "social_oauth";

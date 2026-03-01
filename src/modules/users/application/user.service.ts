@@ -1,7 +1,7 @@
-import { AppError } from "@/infra/errors";
-import { generateRandomToken, hashPassword } from "@/infra/crypto";
-import { UserRepository } from "./user.repo";
-import type { PublicUser } from "./user.types";
+import { AppError } from "@/shared/errors";
+import { generateRandomToken, hashPassword } from "@/shared/security/crypto";
+import { UserRepository } from "../infrastructure/user.repo";
+import type { PublicUser } from "../domain/user.types";
 import type { DocumentType, UserPlan } from "@prisma/client";
 
 type UserRoleWithRole = { role: { name: string } };

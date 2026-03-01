@@ -1,5 +1,5 @@
 import { env } from "@/config/env";
-import { getRedisClient } from "@/infra/redis";
+import { getRedisClient } from "@/shared/cache/redis";
 
 export class AuthorizationCodeRepository {
   async createAuthCode(data: {
