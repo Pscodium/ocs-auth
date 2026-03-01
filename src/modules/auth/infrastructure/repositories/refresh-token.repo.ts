@@ -20,6 +20,26 @@ export class RefreshTokenRepository {
     });
   }
 
+  async findByHash(tokenHash: string) {
+    return prisma.refreshToken.findUnique({
+      where: { tokenHash }
+    });
+  }
+
+  async revokeActiveByUserAndClient(userId: string, clientId: string) {
+    return prisma.refreshToken.updateMany({
+      where: {
+        userId,
+        clientId,
+        revokedAt: null,
+        expiresAt: { gt: new Date() }
+      },
+      data: {
+        revokedAt: new Date()
+      }
+    });
+  }
+
   async revokeToken(tokenId: string, replacedByTokenId?: string) {
     const data = replacedByTokenId
       ? { revokedAt: new Date(), replacedByTokenId }

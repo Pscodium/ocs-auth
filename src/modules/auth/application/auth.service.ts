@@ -184,11 +184,18 @@ export class AuthService {
 
   private async rotateRefreshToken(input: { grant_type: "refresh_token"; refresh_token: string; client_id: string }) {
     const tokenHash = hashToken(input.refresh_token);
-    const token = await this.refreshTokens.findValidByHash(tokenHash);
+    const token = await this.refreshTokens.findByHash(tokenHash);
     if (!token) {
       throw new AppError("Invalid refresh token", 401, "invalid_grant");
     }
     if (token.clientId !== input.client_id) {
+      throw new AppError("Invalid refresh token", 401, "invalid_grant");
+    }
+    if (token.revokedAt) {
+      await this.refreshTokens.revokeActiveByUserAndClient(token.userId, token.clientId);
+      throw new AppError("Invalid refresh token", 401, "invalid_grant");
+    }
+    if (token.expiresAt.getTime() <= Date.now()) {
       throw new AppError("Invalid refresh token", 401, "invalid_grant");
     }
 
@@ -208,20 +215,7 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + refreshTokenExpiresIn * 1000);
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      const revokeResult = await tx.refreshToken.updateMany({
-        where: {
-          id: token.id,
-          revokedAt: null,
-          expiresAt: { gt: new Date() }
-        },
-        data: { revokedAt: new Date() }
-      });
-
-      if (revokeResult.count !== 1) {
-        throw new AppError("Invalid refresh token", 401, "invalid_grant");
-      }
-
-      await tx.refreshToken.create({
+      const createdToken = await tx.refreshToken.create({
         data: {
           tokenHash: newRefreshTokenHash,
           userId: token.userId,
@@ -229,6 +223,22 @@ export class AuthService {
           expiresAt
         }
       });
+
+      const revokeResult = await tx.refreshToken.updateMany({
+        where: {
+          id: token.id,
+          revokedAt: null,
+          expiresAt: { gt: new Date() }
+        },
+        data: {
+          revokedAt: new Date(),
+          replacedByTokenId: createdToken.id
+        }
+      });
+
+      if (revokeResult.count !== 1) {
+        throw new AppError("Invalid refresh token", 401, "invalid_grant");
+      }
     });
 
     return {

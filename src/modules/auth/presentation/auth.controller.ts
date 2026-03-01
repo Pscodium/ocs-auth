@@ -1,9 +1,39 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { getAuthenticatedUserId } from "@/shared/http/auth-context";
+import { AppError } from "@/shared/errors";
+import { getRedisClient } from "@/shared/cache/redis";
 import { AuthService } from "../application/auth.service";
 import { authorizeQuerySchema, loginSchema, logoutSchema, registerSchema, tokenSchema } from "./auth.schemas";
 
 const authService = new AuthService();
+const TOKEN_RATE_LIMIT_WINDOW_SECONDS = 60;
+
+function getTokenRateLimitByGrantType(grantType: "authorization_code" | "refresh_token") {
+  if (grantType === "refresh_token") {
+    return 8;
+  }
+  return 24;
+}
+
+async function enforceTokenRateLimit(input: {
+  ip: string;
+  clientId: string;
+  grantType: "authorization_code" | "refresh_token";
+}) {
+  const redis = await getRedisClient();
+  const windowBucket = Math.floor(Date.now() / (TOKEN_RATE_LIMIT_WINDOW_SECONDS * 1000));
+  const redisKey = `rate_limit:auth:token:${input.grantType}:${input.clientId}:${input.ip}:${windowBucket}`;
+
+  const currentCount = await redis.incr(redisKey);
+  if (currentCount === 1) {
+    await redis.expire(redisKey, TOKEN_RATE_LIMIT_WINDOW_SECONDS + 1);
+  }
+
+  const maxRequests = getTokenRateLimitByGrantType(input.grantType);
+  if (currentCount > maxRequests) {
+    throw new AppError("Too many token requests", 429, "rate_limit_exceeded");
+  }
+}
 
 export async function registerHandler(request: FastifyRequest, reply: FastifyReply) {
   const body = registerSchema.parse(request.body);
@@ -26,6 +56,11 @@ export async function authorizeHandler(request: FastifyRequest, reply: FastifyRe
 
 export async function tokenHandler(request: FastifyRequest, reply: FastifyReply) {
   const body = tokenSchema.parse(request.body);
+  await enforceTokenRateLimit({
+    ip: request.ip,
+    clientId: body.client_id,
+    grantType: body.grant_type
+  });
   const result = await authService.token(body);
   reply.send(result);
 }
