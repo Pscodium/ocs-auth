@@ -246,7 +246,7 @@ app.get('/protected', async (request, reply) => {
   - `GET /auth/github?redirect_uri=<FRONT_CALLBACK>&client_id=<CLIENT_ID>&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
   - `GET /auth/microsoft?redirect_uri=<FRONT_CALLBACK>&client_id=<CLIENT_ID>&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
 - Callback redirects to front with query params:
-  - `?accessToken=<JWT>&code=<INTERNAL_AUTH_CODE>`
+  - `?code=<INTERNAL_AUTH_CODE>`
 - Use the returned `code` in `POST /auth/token` (`grant_type=authorization_code`) with `client_id`, `redirect_uri` and original `code_verifier` to obtain `refresh_token`.
 - Provider redirects back to callback route.
 - Auth service resolves user by provider account (or email), links/creates user, and returns JSON:
@@ -335,7 +335,6 @@ export async function startMicrosoftLogin(openBrowser) {
 export async function handleSocialCallback(callbackUrl) {
   const url = new URL(callbackUrl);
   const authorizationCode = url.searchParams.get('code');
-  const socialAccessToken = url.searchParams.get('accessToken');
   const codeVerifier = localStorage.getItem('social_code_verifier');
 
   if (!authorizationCode) {
@@ -352,11 +351,6 @@ export async function handleSocialCallback(callbackUrl) {
   // Persist canonical session tokens used by your app
   localStorage.setItem('access_token', tokens.access_token);
   localStorage.setItem('refresh_token', tokens.refresh_token);
-
-  // Optional: direct token from social callback (already JWT from auth service)
-  if (socialAccessToken) {
-    localStorage.setItem('social_access_token', socialAccessToken);
-  }
 
   localStorage.removeItem('social_code_verifier');
 

@@ -58,6 +58,33 @@ export class AuthorizationCodeRepository {
     };
   }
 
+  async consumeValidByHash(codeHash: string) {
+    const redis = await getRedisClient();
+    const raw = await redis.getDel(this.getKey(codeHash));
+    if (!raw) {
+      return null;
+    }
+
+    const data = JSON.parse(raw) as {
+      userId: string;
+      clientId: string;
+      redirectUri: string;
+      codeChallenge: string;
+      codeChallengeMethod: "S256";
+      expiresAt: string;
+    };
+
+    if (new Date(data.expiresAt).getTime() <= Date.now()) {
+      return null;
+    }
+
+    return {
+      codeHash,
+      ...data,
+      expiresAt: new Date(data.expiresAt)
+    };
+  }
+
   async consume(codeHash: string) {
     const redis = await getRedisClient();
     await redis.del(this.getKey(codeHash));

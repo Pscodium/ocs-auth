@@ -62,6 +62,17 @@ export class UserService {
     return this.toPublicUser(user);
   }
 
+  async getActiveUserWithRoles(userId: string): Promise<PublicUser> {
+    const user = await this.users.findById(userId);
+    if (!user) {
+      throw new AppError("User not found", 404, "user_not_found");
+    }
+    if (!user.isActive) {
+      throw new AppError("User is inactive", 403, "user_inactive");
+    }
+    return this.toPublicUser(user);
+  }
+
   async updateUser(
     userId: string,
     input: Partial<{

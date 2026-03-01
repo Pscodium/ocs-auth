@@ -112,6 +112,9 @@ export class SocialAuthService {
 
     const existingUser = await this.users.getUserByEmail(profile.email);
     if (existingUser) {
+      if (!existingUser.isActive) {
+        throw new AppError("User is inactive", 403, "user_inactive");
+      }
       await this.socialAuth.createSocialAccount({
         userId: existingUser.id,
         provider: profile.provider,
@@ -138,7 +141,7 @@ export class SocialAuthService {
 
   private async issueJwtForUser(userId: string): Promise<SocialAuthResult> {
     const { clientId, accessTokenExpiresIn } = await this.getSocialClientConfig();
-    const user = await this.users.getUserWithRoles(userId);
+    const user = await this.users.getActiveUserWithRoles(userId);
     const accessToken = await signAccessToken({
       sub: user.id,
       roles: user.roles,
