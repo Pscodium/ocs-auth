@@ -84,9 +84,8 @@ function clearRedirectCookie(reply: FastifyReply, cookieName: string) {
   reply.clearCookie(cookieName, { path: "/auth" });
 }
 
-function appendAuthParamsToRedirectUri(redirectUri: string, accessToken: string, code: string): string {
+function appendAuthCodeToRedirectUri(redirectUri: string, code: string): string {
   const url = new URL(redirectUri);
-  url.searchParams.set("accessToken", accessToken);
   url.searchParams.set("code", code);
   return url.toString();
 }
@@ -181,7 +180,7 @@ export async function googleOAuthCallbackHandler(request: FastifyRequest, reply:
       codeChallenge: redirectContext.codeChallenge,
       codeChallengeMethod: redirectContext.codeChallengeMethod
     });
-    reply.redirect(appendAuthParamsToRedirectUri(redirectContext.redirectUri, result.accessToken, authorizationCode.code));
+    reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code));
     return;
   }
   reply.send(result);
@@ -199,7 +198,7 @@ export async function githubOAuthCallbackHandler(request: FastifyRequest, reply:
       codeChallenge: redirectContext.codeChallenge,
       codeChallengeMethod: redirectContext.codeChallengeMethod
     });
-    reply.redirect(appendAuthParamsToRedirectUri(redirectContext.redirectUri, result.accessToken, authorizationCode.code));
+    reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code));
     return;
   }
   reply.send(result);
@@ -217,7 +216,7 @@ export async function microsoftOAuthCallbackHandler(request: FastifyRequest, rep
       codeChallenge: redirectContext.codeChallenge,
       codeChallengeMethod: redirectContext.codeChallengeMethod
     });
-    reply.redirect(appendAuthParamsToRedirectUri(redirectContext.redirectUri, result.accessToken, authorizationCode.code));
+    reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code));
     return;
   }
   reply.send(result);

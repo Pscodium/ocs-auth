@@ -42,6 +42,9 @@ export class AuthService {
     if (!user) {
       throw new AppError("Invalid credentials", 401, "invalid_credentials");
     }
+    if (!user.isActive) {
+      throw new AppError("Invalid credentials", 401, "invalid_credentials");
+    }
     const valid = await verifyPassword(user.passwordHash, input.password);
     if (!valid) {
       throw new AppError("Invalid credentials", 401, "invalid_credentials");
@@ -136,7 +139,7 @@ export class AuthService {
     code_verifier: string;
   }) {
     const codeHash = hashToken(input.code);
-    const authCode = await this.authCodes.findValidByHash(codeHash);
+    const authCode = await this.authCodes.consumeValidByHash(codeHash);
     if (!authCode) {
       throw new AppError("Invalid authorization code", 400, "invalid_grant");
     }
@@ -149,11 +152,9 @@ export class AuthService {
       throw new AppError("PKCE validation failed", 400, "invalid_grant");
     }
 
-    await this.authCodes.consume(codeHash);
-
     const { accessTokenExpiresIn, refreshTokenExpiresIn } = await this.getClientConfig(input.client_id);
 
-    const user = await this.users.getUserWithRoles(authCode.userId);
+    const user = await this.users.getActiveUserWithRoles(authCode.userId);
     const accessToken = await signAccessToken({
       sub: user.id,
       roles: user.roles,
@@ -193,7 +194,7 @@ export class AuthService {
 
     const { accessTokenExpiresIn, refreshTokenExpiresIn } = await this.getClientConfig(input.client_id);
 
-    const user = await this.users.getUserWithRoles(token.userId);
+    const user = await this.users.getActiveUserWithRoles(token.userId);
     const accessToken = await signAccessToken({
       sub: user.id,
       roles: user.roles,
@@ -207,10 +208,19 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + refreshTokenExpiresIn * 1000);
 
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      await tx.refreshToken.update({
-        where: { id: token.id },
+      const revokeResult = await tx.refreshToken.updateMany({
+        where: {
+          id: token.id,
+          revokedAt: null,
+          expiresAt: { gt: new Date() }
+        },
         data: { revokedAt: new Date() }
       });
+
+      if (revokeResult.count !== 1) {
+        throw new AppError("Invalid refresh token", 401, "invalid_grant");
+      }
+
       await tx.refreshToken.create({
         data: {
           tokenHash: newRefreshTokenHash,
