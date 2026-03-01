@@ -1,4 +1,4 @@
-import { prisma } from "@/infra/prisma";
+import { prisma } from "@/shared/persistence/prisma";
 import type { SocialProvider } from "@prisma/client";
 
 export class SocialAuthRepository {

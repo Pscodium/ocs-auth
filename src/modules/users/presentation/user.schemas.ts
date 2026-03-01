@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isValidCpf, isValidCnpj } from "@/infra/document-validators";
+import { isValidCpf, isValidCnpj } from "@/shared/security/document-validators";
 
 const docTypeSchema = z.enum(["CPF", "CNPJ"]);
 

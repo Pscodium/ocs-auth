@@ -1,7 +1,7 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { AppError } from "@/infra/errors";
-import { getAuthenticatedUserId } from "@/infra/http/auth-context";
-import { UserService } from "./user.service";
+import { AppError } from "@/shared/errors";
+import { getAuthenticatedUserId } from "@/shared/http/auth-context";
+import { UserService } from "../application/user.service";
 import { updateMeSchema } from "./user.schemas";
 
 const userService = new UserService();

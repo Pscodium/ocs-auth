@@ -1,6 +1,6 @@
 import type { FastifyRequest } from "fastify";
-import { AppError } from "@/infra/errors";
-import { verifyAccessToken } from "@/infra/jwt";
+import { AppError } from "@/shared/errors";
+import { verifyAccessToken } from "@/shared/security/jwt";
 
 export function extractBearerToken(request: FastifyRequest): string {
   const auth = request.headers.authorization;

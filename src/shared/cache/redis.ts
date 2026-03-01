@@ -1,6 +1,6 @@
 import { createClient, type RedisClientType } from "redis";
 import { env } from "@/config/env";
-import type { AppLogger } from "@/infra/logger";
+import type { AppLogger } from "@/shared/observability/logger";
 
 let client: RedisClientType | null = null;
 let redisLogger: AppLogger | null = null;

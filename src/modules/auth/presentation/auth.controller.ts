@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { getAuthenticatedUserId } from "@/infra/http/auth-context";
-import { AuthService } from "./auth.service";
+import { getAuthenticatedUserId } from "@/shared/http/auth-context";
+import { AuthService } from "../application/auth.service";
 import { authorizeQuerySchema, loginSchema, logoutSchema, registerSchema, tokenSchema } from "./auth.schemas";
 
 const authService = new AuthService();

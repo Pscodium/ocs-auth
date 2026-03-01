@@ -1,6 +1,6 @@
 import { buildApp } from "@/app";
 import { env } from "@/config/env";
-import { getLogger } from "@/infra/logger";
+import { getLogger } from "@/shared/observability/logger";
 
 async function start() {
   const app = await buildApp();

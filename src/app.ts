@@ -3,13 +3,13 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { env } from "@/config/env";
 import { ZodError } from "zod";
-import { AppError } from "@/infra/errors";
-import { getJwks } from "@/infra/jwt";
-import { getLogger } from "@/infra/logger";
-import { setRedisLogger } from "@/infra/redis";
-import { socialOAuthPlugin } from "@/modules/auth/social-oauth.plugin";
-import { authRoutes } from "@/modules/auth/auth.routes";
-import { userRoutes } from "@/modules/users/user.routes";
+import { AppError } from "@/shared/errors";
+import { getJwks } from "@/shared/security/jwt";
+import { getLogger } from "@/shared/observability/logger";
+import { setRedisLogger } from "@/shared/cache/redis";
+import { socialOAuthPlugin } from "@/modules/auth/presentation/social-oauth.plugin";
+import { authRoutes } from "@/modules/auth/presentation/auth.routes";
+import { userRoutes } from "@/modules/users/presentation/user.routes";
 
 function getCorsOrigins(): string[] {
   return env.CORS_ORIGIN

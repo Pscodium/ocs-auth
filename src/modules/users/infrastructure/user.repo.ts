@@ -1,4 +1,4 @@
-import { prisma } from "@/infra/prisma";
+import { prisma } from "@/shared/persistence/prisma";
 import type { DocumentType } from "@prisma/client";
 
 export class UserRepository {

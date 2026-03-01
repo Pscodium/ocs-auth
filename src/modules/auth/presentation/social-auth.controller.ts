@@ -1,8 +1,8 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { AppError } from "@/infra/errors";
+import { AppError } from "@/shared/errors";
 import { env } from "@/config/env";
-import { SocialAuthService } from "./social-auth.service";
+import { SocialAuthService } from "../application/social-auth.service";
 
 const socialAuthService = new SocialAuthService();
 

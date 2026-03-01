@@ -1,11 +1,11 @@
 import { Prisma } from "@prisma/client";
-import { prisma } from "@/infra/prisma";
-import { AppError } from "@/infra/errors";
-import { computePkceChallenge, generateRandomToken, hashToken, verifyPassword } from "@/infra/crypto";
-import { signAccessToken } from "@/infra/jwt";
-import { AuthorizationCodeRepository } from "@/modules/tokens/auth-code.repo";
-import { RefreshTokenRepository } from "@/modules/tokens/refresh-token.repo";
-import { UserService } from "@/modules/users/user.service";
+import { prisma } from "@/shared/persistence/prisma";
+import { AppError } from "@/shared/errors";
+import { computePkceChallenge, generateRandomToken, hashToken, verifyPassword } from "@/shared/security/crypto";
+import { signAccessToken } from "@/shared/security/jwt";
+import { AuthorizationCodeRepository } from "@/modules/auth/infrastructure/repositories/auth-code.repo";
+import { RefreshTokenRepository } from "@/modules/auth/infrastructure/repositories/refresh-token.repo";
+import { UserService } from "@/modules/users/application/user.service";
 import { env } from "@/config/env";
 
 export class AuthService {

@@ -39,3 +39,16 @@ Production-ready OAuth2-like authentication service built with Fastify, Prisma, 
 	- Example: `GET /auth/google?redirect_uri=https://financial.pscodium.dev/callback&client_id=electron-app&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
 	- Callback redirects to your app with `?accessToken=<JWT>&code=<INTERNAL_AUTH_CODE>`
 	- Exchange `code` at `POST /auth/token` with `grant_type=authorization_code`, `client_id`, `redirect_uri`, and `code_verifier`.
+
+## Project Structure
+- `src/modules/*/presentation`: HTTP layer (routes, controllers, request schemas).
+- `src/modules/*/application`: application services/use-case orchestration.
+- `src/modules/*/infrastructure`: data access implementations (repositories).
+- `src/modules/*/domain`: module-specific types/contracts.
+- `src/shared`: cross-cutting concerns grouped by concern:
+	- `security` (crypto, jwt, validators)
+	- `persistence` (prisma)
+	- `cache` (redis)
+	- `http` (auth context)
+	- `observability` (logger)
+	- `errors` (app error base class)
