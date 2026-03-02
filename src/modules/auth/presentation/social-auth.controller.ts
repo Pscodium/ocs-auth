@@ -5,6 +5,7 @@ import { env } from "@/config/env";
 import { SocialAuthService } from "../application/social-auth.service";
 
 const socialAuthService = new SocialAuthService();
+const ACCESS_TOKEN_COOKIE_NAME = "access_token";
 
 const socialStartQuerySchema = z.object({
   redirect_uri: z.string().url().optional(),
@@ -82,6 +83,15 @@ function storeRedirectCookie(reply: FastifyReply, cookieName: string, context?: 
 
 function clearRedirectCookie(reply: FastifyReply, cookieName: string) {
   reply.clearCookie(cookieName, { path: "/auth" });
+}
+
+function setAccessTokenCookie(reply: FastifyReply, accessToken: string) {
+  reply.setCookie(ACCESS_TOKEN_COOKIE_NAME, accessToken, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: env.BASE_URL.startsWith("https://")
+  });
 }
 
 function appendAuthCodeToRedirectUri(redirectUri: string, code: string): string {
@@ -183,6 +193,7 @@ export async function googleOAuthCallbackHandler(request: FastifyRequest, reply:
     reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code));
     return;
   }
+  setAccessTokenCookie(reply, result.accessToken);
   reply.send(result);
 }
 
@@ -201,6 +212,7 @@ export async function githubOAuthCallbackHandler(request: FastifyRequest, reply:
     reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code));
     return;
   }
+  setAccessTokenCookie(reply, result.accessToken);
   reply.send(result);
 }
 
@@ -219,5 +231,6 @@ export async function microsoftOAuthCallbackHandler(request: FastifyRequest, rep
     reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code));
     return;
   }
+  setAccessTokenCookie(reply, result.accessToken);
   reply.send(result);
 }

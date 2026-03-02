@@ -9,6 +9,7 @@ import { authorizeQuerySchema, loginSchema, logoutSchema, registerSchema, tokenS
 const authService = new AuthService();
 const TOKEN_RATE_LIMIT_WINDOW_SECONDS = 60;
 const REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
+const ACCESS_TOKEN_COOKIE_NAME = "access_token";
 
 function shouldUseSecureCookies() {
   return env.NODE_ENV === "production" || requestBaseUrlIsHttps();
@@ -28,9 +29,28 @@ function setRefreshTokenCookie(reply: FastifyReply, refreshToken: string, maxAge
   });
 }
 
+function setAccessTokenCookie(reply: FastifyReply, accessToken: string, maxAgeSeconds?: number) {
+  reply.setCookie(ACCESS_TOKEN_COOKIE_NAME, accessToken, {
+    httpOnly: true,
+    secure: shouldUseSecureCookies(),
+    sameSite: "lax",
+    path: "/",
+    ...(maxAgeSeconds ? { maxAge: maxAgeSeconds } : {})
+  });
+}
+
 function clearRefreshTokenCookie(reply: FastifyReply) {
   reply.clearCookie(REFRESH_TOKEN_COOKIE_NAME, {
     path: "/auth",
+    httpOnly: true,
+    secure: shouldUseSecureCookies(),
+    sameSite: "lax"
+  });
+}
+
+function clearAccessTokenCookie(reply: FastifyReply) {
+  reply.clearCookie(ACCESS_TOKEN_COOKIE_NAME, {
+    path: "/",
     httpOnly: true,
     secure: shouldUseSecureCookies(),
     sameSite: "lax"
@@ -103,6 +123,9 @@ export async function tokenHandler(request: FastifyRequest, reply: FastifyReply)
       refresh_token: refreshToken
     });
 
+    if (result.access_token) {
+      setAccessTokenCookie(reply, result.access_token, result.expires_in);
+    }
     if (result.refresh_token) {
       setRefreshTokenCookie(reply, result.refresh_token, result.refresh_token_expires_in);
     }
@@ -117,6 +140,9 @@ export async function tokenHandler(request: FastifyRequest, reply: FastifyReply)
   });
 
   const result = await authService.token(body);
+  if ("access_token" in result && result.access_token) {
+    setAccessTokenCookie(reply, result.access_token, result.expires_in);
+  }
   if ("refresh_token" in result && result.refresh_token) {
     setRefreshTokenCookie(reply, result.refresh_token, result.refresh_token_expires_in);
   }
@@ -132,6 +158,7 @@ export async function logoutHandler(request: FastifyRequest, reply: FastifyReply
       client_id: body.client_id
     });
   }
+  clearAccessTokenCookie(reply);
   clearRefreshTokenCookie(reply);
   reply.code(204).send();
 }

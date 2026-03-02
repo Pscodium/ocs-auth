@@ -1,290 +1,102 @@
-# Integration Guide
+# Integration Guide (Front-end)
 
-## Front-end (Electron/Client)
+Este documento é a referência oficial para integrar o front-end com o serviço de autenticação deste projeto.
 
-### 1. Generate PKCE and Login
+Objetivo: usar sessão baseada em cookie HttpOnly para refresh token **e access token**, com PKCE para login por email/senha e login social (Google, GitHub e Microsoft), sem depender de `localStorage` para tokens.
 
-```javascript
-import crypto from 'crypto';
+## 1) Regras obrigatórias do front
 
-// Generate PKCE
-function generatePKCE() {
-  const verifier = crypto.randomBytes(32).toString('base64url');
-  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
-  return { verifier, challenge };
+1. Sempre envie `credentials: 'include'` em chamadas para:
+   - `POST /auth/token`
+   - `POST /auth/logout`
+  - endpoints protegidos da API (ex.: `GET /users/me`, `PATCH /users/me`)
+2. Nunca dependa de `localStorage` para `refresh_token` ou `access_token`.
+  - ambos podem ser usados por cookie HttpOnly.
+3. Para login social, sempre inicie com:
+   - `GET /auth/google?...`
+   - `GET /auth/github?...`
+   - `GET /auth/microsoft?...`
+   incluindo `redirect_uri`, `client_id`, `code_challenge`, `code_challenge_method=S256`.
+4. O `code_verifier` do PKCE precisa sobreviver ao redirect do provider.
+  - Use `sessionStorage` (recomendado) ou cookie não-HttpOnly próprio do front.
+5. O `redirect_uri` precisa:
+   - ser URL válida (`http`/`https`),
+   - estar cadastrado no `OAuthClient.redirectUris` do `client_id`,
+   - ter origem permitida em `CORS_ORIGIN` do auth server.
+
+---
+
+## 2) Fluxo de login por email/senha (Authorization Code + PKCE)
+
+### 2.1 Gerar PKCE
+
+```ts
+function base64UrlEncode(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// Login
-async function login(email, password) {
-  const pkce = generatePKCE();
-  
-  const response = await fetch('http://localhost:3000/auth/login', {
+async function sha256(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return base64UrlEncode(hash);
+}
+
+function randomVerifier(length = 64): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+}
+
+export async function createPkcePair() {
+  const verifier = randomVerifier(64);
+  const challenge = await sha256(verifier);
+  return { verifier, challenge, method: 'S256' as const };
+}
+```
+
+### 2.2 Login e recebimento do `code`
+
+```ts
+const AUTH_BASE_URL = 'http://localhost:3000';
+const CLIENT_ID = 'electron-app';
+const FRONT_CALLBACK_URL = 'http://localhost:14000/callback';
+
+export async function loginWithPassword(email: string, password: string) {
+  const pkce = await createPkcePair();
+
+  const response = await fetch(`${AUTH_BASE_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email,
       password,
-      client_id: 'electron-app',
-      redirect_uri: 'http://localhost:14000/callback',
+      client_id: CLIENT_ID,
+      redirect_uri: FRONT_CALLBACK_URL,
       code_challenge: pkce.challenge,
-      code_challenge_method: 'S256'
+      code_challenge_method: pkce.method
     })
   });
-  
+
+  if (!response.ok) {
+    throw new Error(`Login failed: ${response.status}`);
+  }
+
   const { code } = await response.json();
-  
-  // Exchange code for tokens
-  return exchangeCode(code, pkce.verifier);
-}
-
-async function exchangeCode(code, verifier) {
-  const response = await fetch('http://localhost:3000/auth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: 'http://localhost:14000/callback',
-      client_id: 'electron-app',
-      code_verifier: verifier
-    })
-  });
-  
-  const tokens = await response.json();
-    // { access_token, refresh_token, refresh_token_expires_in, expires_in, token_type }
-  
-    // Store only access token in JS storage.
-    // refresh_token is also issued in HttpOnly cookie by backend.
-  localStorage.setItem('access_token', tokens.access_token);
-  
-  return tokens;
+  return exchangeAuthorizationCode(code, pkce.verifier);
 }
 ```
 
-### 2. Use Access Token in API Requests
+### 2.3 Troca de `code` por tokens
 
-```javascript
-async function callAPI() {
-  const accessToken = localStorage.getItem('access_token');
-  
-  const response = await fetch('https://api.example.com/data', {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`
-    }
-  });
-  
-  return response.json();
-}
-```
-
-### 3. Refresh Token When Expired
-
-```javascript
-async function refreshToken() {
-  const response = await fetch('http://localhost:3000/auth/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
-      grant_type: 'refresh_token',
-      client_id: 'electron-app'
-    })
-  });
-  
-  const tokens = await response.json();
-  localStorage.setItem('access_token', tokens.access_token);
-  
-  return tokens;
-}
-```
-
-### 4. Logout
-
-```javascript
-async function logout() {
-  await fetch('http://localhost:3000/auth/logout', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({
-      client_id: 'electron-app'
-    })
-  });
-  
-  localStorage.removeItem('access_token');
-}
-```
-
----
-
-## Back-end (API/Resource Server)
-
-### Validate JWT Using JWKS
-
-```javascript
-import { createRemoteJWKSet, jwtVerify } from 'jose';
-
-const JWKS = createRemoteJWKSet(new URL('http://localhost:3000/.well-known/jwks.json'));
-
-async function validateAccessToken(token) {
-  try {
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: 'http://localhost:3000',
-      audience: 'api://default'
-    });
-    
-    return {
-      userId: payload.sub,
-      roles: payload.roles,
-      clientId: payload.client_id
-    };
-  } catch (error) {
-    throw new Error('Invalid token');
-  }
-}
-
-// Express Middleware
-export async function authMiddleware(req, res, next) {
-  const auth = req.headers.authorization;
-  
-  if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
-  
-  const token = auth.slice('Bearer '.length);
-  
-  try {
-    req.user = await validateAccessToken(token);
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'invalid_token' });
-  }
-}
-
-// Usage
-app.get('/protected', authMiddleware, (req, res) => {
-  res.json({ 
-    message: 'OK', 
-    userId: req.user.userId, 
-    roles: req.user.roles 
-  });
-});
-```
-
-### Fastify Plugin
-
-```javascript
-import { createRemoteJWKSet, jwtVerify } from 'jose';
-
-const JWKS = createRemoteJWKSet(new URL('http://localhost:3000/.well-known/jwks.json'));
-
-async function validateAccessToken(token) {
-  const { payload } = await jwtVerify(token, JWKS, {
-    issuer: 'http://localhost:3000',
-    audience: 'api://default'
-  });
-  
-  return {
-    userId: payload.sub,
-    roles: payload.roles,
-    clientId: payload.client_id
-  };
-}
-
-// Fastify Decorator
-app.decorateRequest('user', null);
-
-app.addHook('onRequest', async (request, reply) => {
-  const auth = request.headers.authorization;
-  
-  if (!auth || !auth.startsWith('Bearer ')) {
-    reply.code(401).send({ error: 'unauthorized' });
-    return;
-  }
-  
-  const token = auth.slice('Bearer '.length);
-  
-  try {
-    request.user = await validateAccessToken(token);
-  } catch (error) {
-    reply.code(401).send({ error: 'invalid_token' });
-  }
-});
-
-// Usage
-app.get('/protected', async (request, reply) => {
-  reply.send({ 
-    message: 'OK', 
-    userId: request.user.userId, 
-    roles: request.user.roles 
-  });
-});
-```
-
----
-
-## Authentication Flow Summary
-
-1. **Front-end**: Generate PKCE → Login → Receive authorization code
-2. **Front-end**: Exchange code with verifier → Receive access + refresh tokens
-3. **Front-end**: Send `Authorization: Bearer <access_token>` in API requests
-4. **Back-end**: Validate JWT using JWKS from auth service
-5. **Front-end**: Refresh token when access token expires (10 minutes)
-
----
-
-## Social OAuth2 Flow
-
-- Start login in browser with PKCE/client context:
-  - `GET /auth/google?redirect_uri=<FRONT_CALLBACK>&client_id=<CLIENT_ID>&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
-  - `GET /auth/github?redirect_uri=<FRONT_CALLBACK>&client_id=<CLIENT_ID>&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
-  - `GET /auth/microsoft?redirect_uri=<FRONT_CALLBACK>&client_id=<CLIENT_ID>&code_challenge=<PKCE_CHALLENGE>&code_challenge_method=S256`
-- Callback redirects to front with query params:
-  - `?code=<INTERNAL_AUTH_CODE>`
-- Use the returned `code` in `POST /auth/token` (`grant_type=authorization_code`) with `client_id`, `redirect_uri` and original `code_verifier` to obtain `refresh_token`.
-- Provider redirects back to callback route.
-- Auth service resolves user by provider account (or email), links/creates user, and returns JSON:
-
-```json
-{
-  "accessToken": "<JWT>",
-  "user": {
-    "id": "<USER_ID>",
-    "email": "user@example.com",
-    "name": "Jane Doe"
-  }
-}
-```
-
-### Complete Front-end Example (Social + PKCE)
-
-```javascript
-import crypto from 'crypto';
-
-const AUTH_BASE_URL = 'http://localhost:3000';
-const CLIENT_ID = 'electron-app';
-const FRONT_CALLBACK_URL = 'http://localhost:14000/callback';
-
-function generatePKCE() {
-  const verifier = crypto.randomBytes(32).toString('base64url');
-  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
-  return { verifier, challenge };
-}
-
-function buildSocialStartUrl(provider, pkce) {
-  const url = new URL(`${AUTH_BASE_URL}/auth/${provider}`);
-  url.searchParams.set('redirect_uri', FRONT_CALLBACK_URL);
-  url.searchParams.set('client_id', CLIENT_ID);
-  url.searchParams.set('code_challenge', pkce.challenge);
-  url.searchParams.set('code_challenge_method', 'S256');
-  return url.toString();
-}
-
-async function exchangeAuthorizationCode(code, codeVerifier) {
+```ts
+export async function exchangeAuthorizationCode(code: string, codeVerifier: string) {
   const response = await fetch(`${AUTH_BASE_URL}/auth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({
       grant_type: 'authorization_code',
       code,
@@ -295,163 +107,262 @@ async function exchangeAuthorizationCode(code, codeVerifier) {
   });
 
   if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Token exchange failed: ${response.status} ${errorBody}`);
+    const body = await response.text();
+    throw new Error(`Token exchange failed: ${response.status} ${body}`);
   }
 
   return response.json();
+  // resposta inclui access_token e, quando aplicável, refresh_token.
+  // backend também envia access_token e refresh_token em cookies HttpOnly.
+}
+```
+
+---
+
+## 3) Fluxo de login social (Google/GitHub/Microsoft)
+
+## Importante
+
+O backend guarda contexto do redirect social em cookie HttpOnly temporário (`/auth`, 10 minutos):
+- `google-social-redirect-uri`
+- `github-social-redirect-uri`
+- `microsoft-social-redirect-uri`
+
+Além disso, o plugin OAuth guarda cookies de state/verifier do provider.
+
+Se o front iniciar o fluxo de forma incorreta (sem query params obrigatórios, em contexto que perde cookies, ou sem persistir `code_verifier` entre redirects), o callback social quebra.
+
+### 3.1 Iniciar social login corretamente
+
+```ts
+function buildSocialStartUrl(
+  provider: 'google' | 'github' | 'microsoft',
+  codeChallenge: string
+) {
+  const url = new URL(`${AUTH_BASE_URL}/auth/${provider}`);
+  url.searchParams.set('redirect_uri', FRONT_CALLBACK_URL);
+  url.searchParams.set('client_id', CLIENT_ID);
+  url.searchParams.set('code_challenge', codeChallenge);
+  url.searchParams.set('code_challenge_method', 'S256');
+  return url.toString();
 }
 
-export async function startGoogleLogin(openBrowser) {
-  const pkce = generatePKCE();
+export async function startSocialLogin(provider: 'google' | 'github' | 'microsoft') {
+  const pkce = await createPkcePair();
 
-  // Persist temporarily until callback returns
-  localStorage.setItem('social_code_verifier', pkce.verifier);
+  // Necessário para sobreviver ao redirect sem usar localStorage
+  sessionStorage.setItem('pending_social_code_verifier', pkce.verifier);
 
-  const socialUrl = buildSocialStartUrl('google', pkce);
-  await openBrowser(socialUrl);
+  const socialStartUrl = buildSocialStartUrl(provider, pkce.challenge);
+
+  // Web SPA:
+  window.location.assign(socialStartUrl);
+
+  // Electron: shell.openExternal(socialStartUrl)
 }
+```
 
-export async function startGithubLogin(openBrowser) {
-  const pkce = generatePKCE();
-  localStorage.setItem('social_code_verifier', pkce.verifier);
-  const socialUrl = buildSocialStartUrl('github', pkce);
-  await openBrowser(socialUrl);
-}
+### 3.2 Processar callback do front e trocar `code`
 
-export async function startMicrosoftLogin(openBrowser) {
-  const pkce = generatePKCE();
-  localStorage.setItem('social_code_verifier', pkce.verifier);
-  const socialUrl = buildSocialStartUrl('microsoft', pkce);
-  await openBrowser(socialUrl);
-}
-
-// Call this when your app receives FRONT_CALLBACK_URL
-export async function handleSocialCallback(callbackUrl) {
+```ts
+export async function handleFrontCallback(callbackUrl: string) {
   const url = new URL(callbackUrl);
-  const authorizationCode = url.searchParams.get('code');
-  const codeVerifier = localStorage.getItem('social_code_verifier');
+  const code = url.searchParams.get('code');
 
-  if (!authorizationCode) {
-    throw new Error('Missing internal authorization code in callback URL');
+  if (!code) {
+    throw new Error('Missing code in callback URL');
   }
 
+  const codeVerifier = sessionStorage.getItem('pending_social_code_verifier');
   if (!codeVerifier) {
-    throw new Error('Missing PKCE code verifier');
+    throw new Error('Missing PKCE code verifier (social redirect lost state)');
   }
 
-  // Exchange internal code to obtain refresh token for app session
-  const tokens = await exchangeAuthorizationCode(authorizationCode, codeVerifier);
+  const tokens = await exchangeAuthorizationCode(code, codeVerifier);
 
-  // Persist canonical session tokens used by your app
-  localStorage.setItem('access_token', tokens.access_token);
-  localStorage.setItem('refresh_token', tokens.refresh_token);
-
-  localStorage.removeItem('social_code_verifier');
+  sessionStorage.removeItem('pending_social_code_verifier');
 
   return tokens;
 }
 ```
 
-For Electron, `openBrowser` can wrap `shell.openExternal(url)`. In web apps, use `window.location.assign(url)`.
+---
+
+## 4) Refresh token (cookie HttpOnly)
+
+```ts
+export async function refreshSession() {
+  const response = await fetch(`${AUTH_BASE_URL}/auth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      client_id: CLIENT_ID
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Refresh failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+```
+
+Observações:
+- `refresh_token` no body é opcional; se omitido, backend lê do cookie `refresh_token`.
+- Sem `credentials: 'include'`, o cookie não é enviado e o refresh falha.
+
+### 4.1 Chamar API protegida sem guardar token em storage
+
+Com o backend atual, o acesso autenticado pode usar cookie HttpOnly (`access_token`) automaticamente.
+
+```ts
+export async function getCurrentUser() {
+  const response = await fetch(`${AUTH_BASE_URL}/users/me`, {
+    method: 'GET',
+    credentials: 'include'
+  });
+
+  if (!response.ok) {
+    throw new Error(`Get me failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+```
+
+```ts
+export async function updateCurrentUser(payload: {
+  fullName?: string;
+  email?: string;
+  docType?: 'CPF' | 'CNPJ';
+  document?: string;
+}) {
+  const response = await fetch(`${AUTH_BASE_URL}/users/me`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Update me failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+```
+
+Observação:
+- `Authorization: Bearer` continua suportado para compatibilidade, mas para segurança no front o recomendado é cookie HttpOnly + `credentials: 'include'`.
 
 ---
 
-## cURL Examples
+## 5) Logout
 
-### Register
+```ts
+export async function logout() {
+  const response = await fetch(`${AUTH_BASE_URL}/auth/logout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ client_id: CLIENT_ID })
+  });
 
-```bash
-curl -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"fullName":"Jane Doe","email":"user@example.com","password":"StrongPass123"}'
-```
-
-### Login (returns authorization code)
-
-```bash
-curl -X POST http://localhost:3000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email":"user@example.com",
-    "password":"StrongPass123",
-    "client_id":"electron-app",
-    "redirect_uri":"http://localhost:14000/callback",
-    "code_challenge":"E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
-    "code_challenge_method":"S256",
-    "state":"abc123"
-  }'
-```
-
-### Token Exchange (authorization_code + PKCE)
-
-```bash
-curl -X POST http://localhost:3000/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{
-    "grant_type":"authorization_code",
-    "code":"<AUTH_CODE>",
-    "redirect_uri":"http://localhost:14000/callback",
-    "client_id":"electron-app",
-    "code_verifier":"<CODE_VERIFIER>"
-  }'
-```
-
-### Refresh Token Rotation
-
-```bash
-curl -X POST http://localhost:3000/auth/token \
-  -H "Content-Type: application/json" \
-  -d '{
-    "grant_type":"refresh_token",
-    "refresh_token":"<REFRESH_TOKEN>",
-    "client_id":"electron-app"
-  }'
-```
-
-### Logout (revoke refresh token)
-
-```bash
-curl -X POST http://localhost:3000/auth/logout \
-  -H "Content-Type: application/json" \
-  -d '{
-    "refresh_token":"<REFRESH_TOKEN>",
-    "client_id":"electron-app"
-  }'
-```
-
-### Update Current User
-
-```bash
-curl -X PATCH http://localhost:3000/users/me \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  -d '{
-    "fullName":"Jane Doe Silva",
-    "email":"new-user@example.com",
-    "docType":"CPF",
-    "document":"11144477735"
-  }'
-```
-
-### Get Current User
-
-```bash
-curl -X GET http://localhost:3000/users/me \
-  -H "Authorization: Bearer <ACCESS_TOKEN>"
-```
-
-### JWKS
-
-```bash
-curl http://localhost:3000/.well-known/jwks.json
+  if (!response.ok && response.status !== 204) {
+    throw new Error(`Logout failed: ${response.status}`);
+  }
+}
 ```
 
 ---
 
-## Setup Required
+## 6) Causa comum do problema no social após remover localStorage
 
-Before testing, create an OAuth client in the database:
+Se email/senha funciona e social não, normalmente é um destes pontos:
+
+1. `code_verifier` social foi perdido no redirect.
+   - Correção: guardar temporariamente em `sessionStorage` até a troca de token.
+2. Social start foi chamado sem `redirect_uri`, `client_id`, `code_challenge`.
+   - Correção: usar sempre URL de início com os 4 parâmetros.
+3. `POST /auth/token` sem `credentials: 'include'`.
+   - Correção: incluir sempre para receber/enviar cookie HttpOnly.
+4. `redirect_uri` inválido para o cliente ou origem fora de `CORS_ORIGIN`.
+   - Correção: alinhar DB (`OAuthClient.redirectUris`) e env (`CORS_ORIGIN`).
+5. Início e callback em contextos de browser diferentes.
+   - Correção: manter fluxo no mesmo contexto de cookies (ou tratar handshake no app quando usar browser externo).
+6. Chamadas à API protegida sem `credentials: 'include'`.
+  - Correção: incluir `credentials` para enviar `access_token` cookie.
+
+---
+
+## 7) Contrato de endpoints (resumo)
+
+### `POST /auth/login`
+Body:
+```json
+{
+  "email": "user@example.com",
+  "password": "StrongPass123!",
+  "client_id": "electron-app",
+  "redirect_uri": "http://localhost:14000/callback",
+  "code_challenge": "...",
+  "code_challenge_method": "S256"
+}
+```
+Resposta:
+```json
+{
+  "code": "<authorization_code>",
+  "expires_in": 600
+}
+```
+
+### `GET /auth/{provider}`
+Query obrigatória para fluxo de código interno:
+- `redirect_uri`
+- `client_id`
+- `code_challenge`
+- `code_challenge_method=S256`
+
+### `POST /auth/token`
+Body (`authorization_code`):
+```json
+{
+  "grant_type": "authorization_code",
+  "code": "<authorization_code>",
+  "redirect_uri": "http://localhost:14000/callback",
+  "client_id": "electron-app",
+  "code_verifier": "..."
+}
+```
+
+Body (`refresh_token`):
+```json
+{
+  "grant_type": "refresh_token",
+  "client_id": "electron-app"
+}
+```
+
+Observação:
+- A resposta também pode incluir tokens no JSON por compatibilidade, mas o front seguro não precisa persisti-los em storage.
+
+### `POST /auth/logout`
+Body:
+```json
+{
+  "client_id": "electron-app"
+}
+```
+
+---
+
+## 8) Setup mínimo de banco
+
+Antes de testar, garanta clientes OAuth cadastrados:
 
 ```sql
 INSERT INTO "OAuthClient" (id, name, "isPublic", "redirectUris", "createdAt", "updatedAt")
@@ -462,7 +373,8 @@ VALUES (
   ARRAY['http://localhost:14000/callback'],
   NOW(),
   NOW()
-);
+)
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO "OAuthClient" (id, name, "isPublic", "redirectUris", "accessTokenExpiresIn", "refreshTokenExpiresIn", "createdAt", "updatedAt")
 VALUES (
@@ -478,8 +390,13 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 ```
 
-Or use Prisma Studio:
+---
 
-```bash
-npx prisma studio
-```
+## 9) Checklist rápido para o front
+
+- Implementou PKCE (`verifier` + `challenge S256`).
+- Em social login, guardou `code_verifier` até voltar do callback.
+- Chama `/auth/{provider}` com query completa obrigatória.
+- Usa `credentials: 'include'` em `/auth/token`, `/auth/logout` e endpoints protegidos.
+- Não depende de `localStorage` para refresh token nem access token.
+- `redirect_uri` está cadastrado e permitido.
