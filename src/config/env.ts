@@ -12,6 +12,8 @@ const envSchema = z.object({
   ISSUER_URL: z.string().url(),
   AUDIENCE: z.string().min(1),
   CORS_ORIGIN: z.string().optional(),
+  COOKIE_DOMAIN: z.string().optional(),
+  COOKIE_SAME_SITE: z.enum(["strict", "lax", "none"]).default("lax"),
   REDIS_URL: z.string().min(1),
   // Token expiration times (in seconds)
   ACCESS_TOKEN_EXPIRES_IN: z.coerce.number().int().positive().default(600),           // 10 minutes

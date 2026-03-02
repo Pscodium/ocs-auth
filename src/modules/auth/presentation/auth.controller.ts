@@ -19,41 +19,58 @@ function requestBaseUrlIsHttps() {
   return env.BASE_URL.startsWith("https://");
 }
 
+function getCookieDomain() {
+  const domain = env.COOKIE_DOMAIN?.trim();
+  return domain && domain.length > 0 ? domain : undefined;
+}
+
+function getCookieSameSite() {
+  return env.COOKIE_SAME_SITE;
+}
+
 function setRefreshTokenCookie(reply: FastifyReply, refreshToken: string, maxAgeSeconds?: number) {
+  const domain = getCookieDomain();
   reply.setCookie(REFRESH_TOKEN_COOKIE_NAME, refreshToken, {
     httpOnly: true,
     secure: shouldUseSecureCookies(),
-    sameSite: "lax",
+    sameSite: getCookieSameSite(),
     path: "/auth",
+    ...(domain ? { domain } : {}),
     ...(maxAgeSeconds ? { maxAge: maxAgeSeconds } : {})
   });
 }
 
 function setAccessTokenCookie(reply: FastifyReply, accessToken: string, maxAgeSeconds?: number) {
+  const domain = getCookieDomain();
   reply.setCookie(ACCESS_TOKEN_COOKIE_NAME, accessToken, {
     httpOnly: true,
     secure: shouldUseSecureCookies(),
-    sameSite: "lax",
+    sameSite: getCookieSameSite(),
     path: "/",
+    ...(domain ? { domain } : {}),
     ...(maxAgeSeconds ? { maxAge: maxAgeSeconds } : {})
   });
 }
 
 function clearRefreshTokenCookie(reply: FastifyReply) {
+  const domain = getCookieDomain();
   reply.clearCookie(REFRESH_TOKEN_COOKIE_NAME, {
     path: "/auth",
     httpOnly: true,
     secure: shouldUseSecureCookies(),
-    sameSite: "lax"
+    sameSite: getCookieSameSite(),
+    ...(domain ? { domain } : {})
   });
 }
 
 function clearAccessTokenCookie(reply: FastifyReply) {
+  const domain = getCookieDomain();
   reply.clearCookie(ACCESS_TOKEN_COOKIE_NAME, {
     path: "/",
     httpOnly: true,
     secure: shouldUseSecureCookies(),
-    sameSite: "lax"
+    sameSite: getCookieSameSite(),
+    ...(domain ? { domain } : {})
   });
 }
 

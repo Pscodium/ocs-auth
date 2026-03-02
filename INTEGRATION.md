@@ -24,6 +24,17 @@ Objetivo: usar sessão baseada em cookie HttpOnly para refresh token **e access 
    - estar cadastrado no `OAuthClient.redirectUris` do `client_id`,
    - ter origem permitida em `CORS_ORIGIN` do auth server.
 
+## 1.1) Deploy com auth/api em subdomínios diferentes
+
+Se seu auth estiver em `auth.pscodium.dev` e sua API em `api.pscodium.dev`, configure no auth server:
+
+- `COOKIE_DOMAIN=.pscodium.dev`
+- `COOKIE_SAME_SITE=lax` (ou `none` se seu cenário realmente for cross-site)
+- `BASE_URL=https://auth.pscodium.dev`
+- `CORS_ORIGIN` incluindo explicitamente a origem do front (ex.: `https://app.pscodium.dev`)
+
+Sem `COOKIE_DOMAIN` compartilhado, o cookie fica host-only em `auth.pscodium.dev` e não é enviado para `api.pscodium.dev`.
+
 ---
 
 ## 2) Fluxo de login por email/senha (Authorization Code + PKCE)
@@ -257,6 +268,7 @@ export async function updateCurrentUser(payload: {
 
 Observação:
 - `Authorization: Bearer` continua suportado para compatibilidade, mas para segurança no front o recomendado é cookie HttpOnly + `credentials: 'include'`.
+- Em arquitetura multi-subdomínio, o cookie só chega na API de dados se `Domain` estiver configurado para o domínio pai (ex.: `.pscodium.dev`).
 
 ---
 
@@ -295,6 +307,8 @@ Se email/senha funciona e social não, normalmente é um destes pontos:
    - Correção: manter fluxo no mesmo contexto de cookies (ou tratar handshake no app quando usar browser externo).
 6. Chamadas à API protegida sem `credentials: 'include'`.
   - Correção: incluir `credentials` para enviar `access_token` cookie.
+7. Cookie criado como host-only em `auth.<dominio>`.
+  - Correção: configurar `COOKIE_DOMAIN=.<dominio>` no serviço de auth.
 
 ---
 
@@ -400,3 +414,11 @@ ON CONFLICT (id) DO NOTHING;
 - Usa `credentials: 'include'` em `/auth/token`, `/auth/logout` e endpoints protegidos.
 - Não depende de `localStorage` para refresh token nem access token.
 - `redirect_uri` está cadastrado e permitido.
+
+## 10) Checklist rápido de produção (subdomínios)
+
+- Auth em HTTPS com `BASE_URL` correto.
+- `Set-Cookie` do `access_token` com `Domain=.pscodium.dev`, `Path=/`, `HttpOnly`, `Secure`.
+- `Set-Cookie` do `refresh_token` com `Domain=.pscodium.dev`, `Path=/auth`, `HttpOnly`, `Secure`.
+- Front usa `credentials: 'include'` em todas as chamadas autenticadas.
+- `api.pscodium.dev` responde CORS com `Access-Control-Allow-Credentials: true` e `Access-Control-Allow-Origin` explícito.

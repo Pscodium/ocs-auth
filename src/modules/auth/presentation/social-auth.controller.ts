@@ -45,6 +45,19 @@ type SocialRedirectContext = z.infer<typeof socialRedirectContextCookieSchema>;
 
 const REDIRECT_COOKIE_TTL_SECONDS = 600;
 
+function shouldUseSecureCookies() {
+  return env.NODE_ENV === "production" || env.BASE_URL.startsWith("https://");
+}
+
+function getCookieDomain() {
+  const domain = env.COOKIE_DOMAIN?.trim();
+  return domain && domain.length > 0 ? domain : undefined;
+}
+
+function getCookieSameSite() {
+  return env.COOKIE_SAME_SITE;
+}
+
 function resolveAllowedOrigins(): string[] {
   return env.CORS_ORIGIN
     ? env.CORS_ORIGIN.split(",").map((origin) => origin.trim()).filter(Boolean)
@@ -72,25 +85,36 @@ function storeRedirectCookie(reply: FastifyReply, cookieName: string, context?: 
     redirectUri: validateAndNormalizeRedirectUri(context.redirectUri)
   };
 
+  const domain = getCookieDomain();
   reply.setCookie(cookieName, JSON.stringify(normalizedContext), {
     path: "/auth",
     httpOnly: true,
-    sameSite: "lax",
-    secure: env.BASE_URL.startsWith("https://"),
+    sameSite: getCookieSameSite(),
+    secure: shouldUseSecureCookies(),
+    ...(domain ? { domain } : {}),
     maxAge: REDIRECT_COOKIE_TTL_SECONDS
   });
 }
 
 function clearRedirectCookie(reply: FastifyReply, cookieName: string) {
-  reply.clearCookie(cookieName, { path: "/auth" });
+  const domain = getCookieDomain();
+  reply.clearCookie(cookieName, {
+    path: "/auth",
+    httpOnly: true,
+    sameSite: getCookieSameSite(),
+    secure: shouldUseSecureCookies(),
+    ...(domain ? { domain } : {})
+  });
 }
 
 function setAccessTokenCookie(reply: FastifyReply, accessToken: string) {
+  const domain = getCookieDomain();
   reply.setCookie(ACCESS_TOKEN_COOKIE_NAME, accessToken, {
     path: "/",
     httpOnly: true,
-    sameSite: "lax",
-    secure: env.BASE_URL.startsWith("https://")
+    sameSite: getCookieSameSite(),
+    secure: shouldUseSecureCookies(),
+    ...(domain ? { domain } : {})
   });
 }
 
