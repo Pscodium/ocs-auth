@@ -10,6 +10,7 @@ const ACCESS_TOKEN_COOKIE_NAME = "access_token";
 const socialStartQuerySchema = z.object({
   redirect_uri: z.string().url().optional(),
   client_id: z.string().min(1).optional(),
+  state: z.string().optional(),
   code_challenge: z.string().min(43).optional(),
   code_challenge_method: z.literal("S256").optional()
 }).superRefine((value, ctx) => {
@@ -37,6 +38,7 @@ const socialStartQuerySchema = z.object({
 const socialRedirectContextCookieSchema = z.object({
   redirectUri: z.string().url(),
   clientId: z.string().min(1),
+  state: z.string().optional(),
   codeChallenge: z.string().min(43),
   codeChallengeMethod: z.literal("S256")
 });
@@ -118,9 +120,12 @@ function setAccessTokenCookie(reply: FastifyReply, accessToken: string) {
   });
 }
 
-function appendAuthCodeToRedirectUri(redirectUri: string, code: string): string {
+function appendAuthCodeToRedirectUri(redirectUri: string, code: string, state?: string): string {
   const url = new URL(redirectUri);
   url.searchParams.set("code", code);
+  if (state) {
+    url.searchParams.set("state", state);
+  }
   return url.toString();
 }
 
@@ -147,13 +152,13 @@ function getRedirectContextFromCookie(request: FastifyRequest, cookieName: strin
     redirectUri: validateAndNormalizeRedirectUri(parsed.data.redirectUri)
   };
 }
-
 export async function googleOAuthStartHandler(request: FastifyRequest, reply: FastifyReply) {
   const query = socialStartQuerySchema.parse(request.query);
   const redirectContext = query.redirect_uri
     ? {
         redirectUri: query.redirect_uri,
         clientId: query.client_id!,
+        state: query.state,
         codeChallenge: query.code_challenge!,
         codeChallengeMethod: query.code_challenge_method ?? "S256"
       }
@@ -172,6 +177,7 @@ export async function githubOAuthStartHandler(request: FastifyRequest, reply: Fa
     ? {
         redirectUri: query.redirect_uri,
         clientId: query.client_id!,
+        state: query.state,
         codeChallenge: query.code_challenge!,
         codeChallengeMethod: query.code_challenge_method ?? "S256"
       }
@@ -214,7 +220,7 @@ export async function googleOAuthCallbackHandler(request: FastifyRequest, reply:
       codeChallenge: redirectContext.codeChallenge,
       codeChallengeMethod: redirectContext.codeChallengeMethod
     });
-    reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code));
+    reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code, redirectContext.state));
     return;
   }
   setAccessTokenCookie(reply, result.accessToken);
@@ -233,7 +239,7 @@ export async function githubOAuthCallbackHandler(request: FastifyRequest, reply:
       codeChallenge: redirectContext.codeChallenge,
       codeChallengeMethod: redirectContext.codeChallengeMethod
     });
-    reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code));
+    reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code, redirectContext.state));
     return;
   }
   setAccessTokenCookie(reply, result.accessToken);
@@ -252,7 +258,7 @@ export async function microsoftOAuthCallbackHandler(request: FastifyRequest, rep
       codeChallenge: redirectContext.codeChallenge,
       codeChallengeMethod: redirectContext.codeChallengeMethod
     });
-    reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code));
+    reply.redirect(appendAuthCodeToRedirectUri(redirectContext.redirectUri, authorizationCode.code, redirectContext.state));
     return;
   }
   setAccessTokenCookie(reply, result.accessToken);
