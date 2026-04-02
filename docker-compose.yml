@@ -9,7 +9,7 @@ services:
       POSTGRES_USER: ocs_auth
       POSTGRES_PASSWORD: ocs_auth
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
 
@@ -17,7 +17,7 @@ services:
     image: redis:7-alpine
     container_name: ocs-auth-redis
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
 
   auth:
     build: .
